@@ -38,10 +38,16 @@
 namespace Service::HID {
 
 // Updating period for each HID device.
-// HID is polled every 15ms, this value was derived from
-// https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering#joy-con-status-data-packet
-constexpr auto pad_update_ns = std::chrono::nanoseconds{1000 * 1000};         // (1ms, 1000Hz)
+constexpr auto default_update_ns = std::chrono::nanoseconds{15 * 1000 * 1000}; // (15ms, 66.666Hz)
+constexpr auto debug_update_ns = default_update_ns;
+// HID touchscreen is polled every 4ms, this value comes from the delta time in touch shared memory
+constexpr auto touchscreen_update_ns = std::chrono::nanoseconds{4 * 1000 * 1000}; // (4ms, 250Hz)
+constexpr auto mouse_update_ns = default_update_ns;
+constexpr auto keyboard_update_ns = default_update_ns;
+constexpr auto xpad_update_ns = default_update_ns;
 constexpr auto motion_update_ns = std::chrono::nanoseconds{15 * 1000 * 1000}; // (15ms, 66.666Hz)
+constexpr auto npad_update_ns = std::chrono::nanoseconds{1 * 1000 * 1000};    // (1ms, 1000Hz)
+constexpr auto gesture_update_ns = default_update_ns;
 constexpr std::size_t SHARED_MEMORY_SIZE = 0x40000;
 
 IAppletResource::IAppletResource(Core::System& system_)
@@ -59,37 +65,92 @@ IAppletResource::IAppletResource(Core::System& system_)
     MakeController<Controller_Mouse>(HidController::Mouse);
     MakeController<Controller_Keyboard>(HidController::Keyboard);
     MakeController<Controller_XPad>(HidController::XPad);
-    MakeController<Controller_Stubbed>(HidController::Unknown1);
-    MakeController<Controller_Stubbed>(HidController::Unknown2);
-    MakeController<Controller_Stubbed>(HidController::Unknown3);
-    MakeController<Controller_Stubbed>(HidController::SixAxisSensor);
+    MakeController<Controller_Stubbed>(HidController::HomeButton);
+    MakeController<Controller_Stubbed>(HidController::SleepButton);
+    MakeController<Controller_Stubbed>(HidController::CaptureButton);
+    MakeController<Controller_Stubbed>(HidController::InputDetector);
+    MakeController<Controller_Stubbed>(HidController::UniquePad);
     MakeController<Controller_NPad>(HidController::NPad);
     MakeController<Controller_Gesture>(HidController::Gesture);
+    MakeController<Controller_Stubbed>(HidController::ConsoleSixAxisSensor);
 
     // Homebrew doesn't try to activate some controllers, so we activate them by default
     GetController<Controller_NPad>(HidController::NPad).ActivateController();
     GetController<Controller_Touchscreen>(HidController::Touchscreen).ActivateController();
 
-    GetController<Controller_Stubbed>(HidController::Unknown1).SetCommonHeaderOffset(0x4c00);
-    GetController<Controller_Stubbed>(HidController::Unknown2).SetCommonHeaderOffset(0x4e00);
-    GetController<Controller_Stubbed>(HidController::Unknown3).SetCommonHeaderOffset(0x5000);
+    GetController<Controller_Stubbed>(HidController::HomeButton).SetCommonHeaderOffset(0x4C00);
+    GetController<Controller_Stubbed>(HidController::SleepButton).SetCommonHeaderOffset(0x4E00);
+    GetController<Controller_Stubbed>(HidController::CaptureButton).SetCommonHeaderOffset(0x5000);
+    GetController<Controller_Stubbed>(HidController::InputDetector).SetCommonHeaderOffset(0x5200);
+    GetController<Controller_Stubbed>(HidController::UniquePad).SetCommonHeaderOffset(0x5A00);
+    GetController<Controller_Stubbed>(HidController::ConsoleSixAxisSensor)
+        .SetCommonHeaderOffset(0x3C200);
 
     // Register update callbacks
-    pad_update_event = Core::Timing::CreateEvent(
-        "HID::UpdatePadCallback",
+    debug_update_event = Core::Timing::CreateEvent(
+        "HID::UpdateDebugCallback",
         [this](std::uintptr_t user_data, std::chrono::nanoseconds ns_late) {
             const auto guard = LockService();
-            UpdateControllers(user_data, ns_late);
+            UpdateController(user_data, ns_late, HidController::DebugPad, debug_update_ns,
+                             debug_update_event);
+        });
+    touchscreen_update_event = Core::Timing::CreateEvent(
+        "HID::UpdateTouchscreenCallback",
+        [this](std::uintptr_t user_data, std::chrono::nanoseconds ns_late) {
+            const auto guard = LockService();
+            UpdateController(user_data, ns_late, HidController::Touchscreen, touchscreen_update_ns,
+                             touchscreen_update_event);
+        });
+    mouse_update_event = Core::Timing::CreateEvent(
+        "HID::UpdateMouseCallback",
+        [this](std::uintptr_t user_data, std::chrono::nanoseconds ns_late) {
+            const auto guard = LockService();
+            UpdateController(user_data, ns_late, HidController::Mouse, mouse_update_ns,
+                             mouse_update_event);
+        });
+    keyboard_update_event = Core::Timing::CreateEvent(
+        "HID::UpdateKeyboardCallback",
+        [this](std::uintptr_t user_data, std::chrono::nanoseconds ns_late) {
+            const auto guard = LockService();
+            UpdateController(user_data, ns_late, HidController::Keyboard, keyboard_update_ns,
+                             keyboard_update_event);
+        });
+    xpad_update_event = Core::Timing::CreateEvent(
+        "HID::UpdateXpadCallback",
+        [this](std::uintptr_t user_data, std::chrono::nanoseconds ns_late) {
+            const auto guard = LockService();
+            UpdateController(user_data, ns_late, HidController::XPad, xpad_update_ns,
+                             xpad_update_event);
+        });
+    npad_update_event = Core::Timing::CreateEvent(
+        "HID::UpdateNpadCallback",
+        [this](std::uintptr_t user_data, std::chrono::nanoseconds ns_late) {
+            const auto guard = LockService();
+            UpdateController(user_data, ns_late, HidController::NPad, npad_update_ns,
+                             npad_update_event);
         });
     motion_update_event = Core::Timing::CreateEvent(
-        "HID::MotionPadCallback",
+        "HID::UpdateMotionCallback",
         [this](std::uintptr_t user_data, std::chrono::nanoseconds ns_late) {
             const auto guard = LockService();
             UpdateMotion(user_data, ns_late);
         });
+    gesture_update_event = Core::Timing::CreateEvent(
+        "HID::UpdateGestureCallback",
+        [this](std::uintptr_t user_data, std::chrono::nanoseconds ns_late) {
+            const auto guard = LockService();
+            UpdateController(user_data, ns_late, HidController::Gesture, gesture_update_ns,
+                          gesture_update_event);
+        });
 
-    system.CoreTiming().ScheduleEvent(pad_update_ns, pad_update_event);
+    system.CoreTiming().ScheduleEvent(debug_update_ns, debug_update_event);
+    system.CoreTiming().ScheduleEvent(touchscreen_update_ns, touchscreen_update_event);
+    system.CoreTiming().ScheduleEvent(mouse_update_ns, mouse_update_event);
+    system.CoreTiming().ScheduleEvent(keyboard_update_ns, keyboard_update_event);
+    system.CoreTiming().ScheduleEvent(xpad_update_ns, xpad_update_event);
     system.CoreTiming().ScheduleEvent(motion_update_ns, motion_update_event);
+    system.CoreTiming().ScheduleEvent(npad_update_ns, npad_update_event);
+    system.CoreTiming().ScheduleEvent(gesture_update_ns, gesture_update_event);
 
     ReloadInputDevices();
 }
@@ -103,7 +164,14 @@ void IAppletResource::DeactivateController(HidController controller) {
 }
 
 IAppletResource ::~IAppletResource() {
-    system.CoreTiming().UnscheduleEvent(pad_update_event, 0);
+    system.CoreTiming().UnscheduleEvent(debug_update_event, 0);
+    system.CoreTiming().UnscheduleEvent(touchscreen_update_event, 0);
+    system.CoreTiming().UnscheduleEvent(mouse_update_event, 0);
+    system.CoreTiming().UnscheduleEvent(keyboard_update_event, 0);
+    system.CoreTiming().UnscheduleEvent(xpad_update_event, 0);
+    system.CoreTiming().UnscheduleEvent(motion_update_event, 0);
+    system.CoreTiming().UnscheduleEvent(npad_update_event, 0);
+    system.CoreTiming().UnscheduleEvent(gesture_update_event, 0);
 }
 
 void IAppletResource::GetSharedMemoryHandle(Kernel::HLERequestContext& ctx) {
@@ -114,28 +182,29 @@ void IAppletResource::GetSharedMemoryHandle(Kernel::HLERequestContext& ctx) {
     rb.PushCopyObjects(shared_mem);
 }
 
-void IAppletResource::UpdateControllers(std::uintptr_t user_data,
-                                        std::chrono::nanoseconds ns_late) {
+void IAppletResource::UpdateController(
+    std::uintptr_t user_data, std::chrono::nanoseconds ns_late, HidController controller,
+    const std::chrono::nanoseconds update_ns,
+    const std::shared_ptr<Core::Timing::EventType> update_event) {
     auto& core_timing = system.CoreTiming();
 
     const bool should_reload = Settings::values.is_device_reload_pending.exchange(false);
-    for (const auto& controller : controllers) {
-        if (should_reload) {
+    // Reload all HID devices
+    if (should_reload) {
+        for (const auto& controller : controllers) {
             controller->OnLoadInputDevices();
         }
-        controller->OnUpdate(core_timing, shared_mem->GetPointer(), SHARED_MEMORY_SIZE);
     }
+    controllers[static_cast<size_t>(controller)]->OnUpdate(core_timing, shared_mem->GetPointer(),
+                                                           SHARED_MEMORY_SIZE);
 
-    core_timing.ScheduleEvent(pad_update_ns - ns_late, pad_update_event);
+    core_timing.ScheduleEvent(update_ns - ns_late, update_event);
 }
 
 void IAppletResource::UpdateMotion(std::uintptr_t user_data, std::chrono::nanoseconds ns_late) {
     auto& core_timing = system.CoreTiming();
-
-    for (const auto& controller : controllers) {
-        controller->OnMotionUpdate(core_timing, shared_mem->GetPointer(), SHARED_MEMORY_SIZE);
-    }
-
+    controllers[static_cast<size_t>(HidController::NPad)]->OnMotionUpdate(
+        core_timing, shared_mem->GetPointer(), SHARED_MEMORY_SIZE);
     core_timing.ScheduleEvent(motion_update_ns - ns_late, motion_update_event);
 }
 

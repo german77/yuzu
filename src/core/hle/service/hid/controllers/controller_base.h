@@ -46,6 +46,7 @@ public:
 
 protected:
     bool is_activated{false};
+    bool is_input_devices_loaded{false};
 
     struct CommonHeader {
         s64_le timestamp;

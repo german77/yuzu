@@ -24,7 +24,7 @@ void Controller_Keyboard::OnUpdate(const Core::Timing::CoreTiming& core_timing, 
     shared_memory.header.timestamp = core_timing.GetCPUTicks();
     shared_memory.header.total_entry_count = 17;
 
-    if (!IsControllerActivated()) {
+    if (!IsControllerActivated() || !is_input_devices_loaded) {
         shared_memory.header.entry_count = 0;
         shared_memory.header.last_entry_index = 0;
         return;
@@ -58,5 +58,6 @@ void Controller_Keyboard::OnLoadInputDevices() {
                    keyboard_keys.begin(), Input::CreateDevice<Input::ButtonDevice>);
     std::transform(Settings::values.keyboard_mods.begin(), Settings::values.keyboard_mods.end(),
                    keyboard_mods.begin(), Input::CreateDevice<Input::ButtonDevice>);
+    is_input_devices_loaded = true;
 }
 } // namespace Service::HID

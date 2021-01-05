@@ -22,7 +22,7 @@ void Controller_Gesture::OnUpdate(const Core::Timing::CoreTiming& core_timing, u
     shared_memory.header.timestamp = core_timing.GetCPUTicks();
     shared_memory.header.total_entry_count = 17;
 
-    if (!IsControllerActivated()) {
+    if (!IsControllerActivated() || !is_input_devices_loaded) {
         shared_memory.header.entry_count = 0;
         shared_memory.header.last_entry_index = 0;
         return;
@@ -40,5 +40,7 @@ void Controller_Gesture::OnUpdate(const Core::Timing::CoreTiming& core_timing, u
     std::memcpy(data + SHARED_MEMORY_OFFSET, &shared_memory, sizeof(SharedMemory));
 }
 
-void Controller_Gesture::OnLoadInputDevices() {}
+void Controller_Gesture::OnLoadInputDevices() {
+    is_input_devices_loaded = true;
+}
 } // namespace Service::HID

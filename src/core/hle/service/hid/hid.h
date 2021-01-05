@@ -29,12 +29,14 @@ enum class HidController : std::size_t {
     Mouse,
     Keyboard,
     XPad,
-    Unknown1,
-    Unknown2,
-    Unknown3,
-    SixAxisSensor,
+    HomeButton,
+    SleepButton,
+    CaptureButton,
+    InputDetector,
+    UniquePad,
     NPad,
     Gesture,
+    ConsoleSixAxisSensor,
 
     MaxControllers,
 };
@@ -64,13 +66,21 @@ private:
     }
 
     void GetSharedMemoryHandle(Kernel::HLERequestContext& ctx);
-    void UpdateControllers(std::uintptr_t user_data, std::chrono::nanoseconds ns_late);
+    void UpdateController(std::uintptr_t user_data, std::chrono::nanoseconds ns_late,
+                          HidController controller, const std::chrono::nanoseconds update_ns,
+                          const std::shared_ptr<Core::Timing::EventType> update_event);
     void UpdateMotion(std::uintptr_t user_data, std::chrono::nanoseconds ns_late);
 
     std::shared_ptr<Kernel::SharedMemory> shared_mem;
 
-    std::shared_ptr<Core::Timing::EventType> pad_update_event;
+    std::shared_ptr<Core::Timing::EventType> debug_update_event;
+    std::shared_ptr<Core::Timing::EventType> touchscreen_update_event;
+    std::shared_ptr<Core::Timing::EventType> mouse_update_event;
+    std::shared_ptr<Core::Timing::EventType> keyboard_update_event;
+    std::shared_ptr<Core::Timing::EventType> xpad_update_event;
     std::shared_ptr<Core::Timing::EventType> motion_update_event;
+    std::shared_ptr<Core::Timing::EventType> npad_update_event;
+    std::shared_ptr<Core::Timing::EventType> gesture_update_event;
 
     std::array<std::unique_ptr<ControllerBase>, static_cast<size_t>(HidController::MaxControllers)>
         controllers{};

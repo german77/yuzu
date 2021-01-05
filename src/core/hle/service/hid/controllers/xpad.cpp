@@ -23,7 +23,7 @@ void Controller_XPad::OnUpdate(const Core::Timing::CoreTiming& core_timing, u8* 
         xpad_entry.header.timestamp = core_timing.GetCPUTicks();
         xpad_entry.header.total_entry_count = 17;
 
-        if (!IsControllerActivated()) {
+        if (!IsControllerActivated() || !is_input_devices_loaded) {
             xpad_entry.header.entry_count = 0;
             xpad_entry.header.last_entry_index = 0;
             return;
@@ -42,5 +42,7 @@ void Controller_XPad::OnUpdate(const Core::Timing::CoreTiming& core_timing, u8* 
     std::memcpy(data + SHARED_MEMORY_OFFSET, &shared_memory, sizeof(SharedMemory));
 }
 
-void Controller_XPad::OnLoadInputDevices() {}
+void Controller_XPad::OnLoadInputDevices() {
+    is_input_devices_loaded = true;
+}
 } // namespace Service::HID

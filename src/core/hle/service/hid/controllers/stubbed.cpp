@@ -18,7 +18,7 @@ void Controller_Stubbed::OnRelease() {}
 
 void Controller_Stubbed::OnUpdate(const Core::Timing::CoreTiming& core_timing, u8* data,
                                   std::size_t size) {
-    if (!smart_update) {
+    if (!smart_update || !is_input_devices_loaded) {
         return;
     }
 
@@ -31,7 +31,9 @@ void Controller_Stubbed::OnUpdate(const Core::Timing::CoreTiming& core_timing, u
     std::memcpy(data + common_offset, &header, sizeof(CommonHeader));
 }
 
-void Controller_Stubbed::OnLoadInputDevices() {}
+void Controller_Stubbed::OnLoadInputDevices() {
+    is_input_devices_loaded = true;
+}
 
 void Controller_Stubbed::SetCommonHeaderOffset(std::size_t off) {
     common_offset = off;

@@ -309,6 +309,7 @@ void Controller_NPad::OnLoadInputDevices() {
             InitializeVibrationDeviceAtIndex(i, device_idx);
         }
     }
+    is_input_devices_loaded = true;
 }
 
 void Controller_NPad::OnRelease() {
@@ -397,7 +398,7 @@ void Controller_NPad::RequestPadStateUpdate(u32 npad_id) {
 
 void Controller_NPad::OnUpdate(const Core::Timing::CoreTiming& core_timing, u8* data,
                                std::size_t data_len) {
-    if (!IsControllerActivated()) {
+    if (!IsControllerActivated() || !is_input_devices_loaded) {
         return;
     }
     for (std::size_t i = 0; i < shared_memory_entries.size(); ++i) {
@@ -539,7 +540,7 @@ void Controller_NPad::OnUpdate(const Core::Timing::CoreTiming& core_timing, u8* 
 
 void Controller_NPad::OnMotionUpdate(const Core::Timing::CoreTiming& core_timing, u8* data,
                                      std::size_t data_len) {
-    if (!IsControllerActivated()) {
+    if (!IsControllerActivated() || !is_input_devices_loaded) {
         return;
     }
     for (std::size_t i = 0; i < shared_memory_entries.size(); ++i) {

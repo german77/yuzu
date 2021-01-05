@@ -25,7 +25,7 @@ void Controller_Touchscreen::OnUpdate(const Core::Timing::CoreTiming& core_timin
     shared_memory.header.timestamp = core_timing.GetCPUTicks();
     shared_memory.header.total_entry_count = 17;
 
-    if (!IsControllerActivated()) {
+    if (!IsControllerActivated() || !is_input_devices_loaded) {
         shared_memory.header.entry_count = 0;
         shared_memory.header.last_entry_index = 0;
         return;
@@ -73,5 +73,6 @@ void Controller_Touchscreen::OnLoadInputDevices() {
     } else {
         touch_btn_device.reset();
     }
+    is_input_devices_loaded = true;
 }
 } // namespace Service::HID
