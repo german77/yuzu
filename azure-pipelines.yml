@@ -1,0 +1,28 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- master
+
+pool:
+  vmImage: ubuntu-default
+
+steps:
+- script: |
+    echo Starting
+    sudo apt-get install build-essential cmake g++-10 gcc-10 git glslang-tools libavcodec-dev libavutil-dev libboost-context-dev libboost-dev liblz4-dev libmbedtls-dev libopus-dev libqt5opengl5-dev libsdl2-dev libssl-dev libswscale-dev libzip-dev libzstd-dev ninja-build python python3-pip qtbase5-dev qtbase5-private-dev qtwebengine5-dev zlib1g-dev &amp;&amp; pip3 install --user conan
+    cmake .. -GNinja -DCMAKE_C_COMPILER=gcc-10 -DCMAKE_CXX_COMPILER=g++-10
+    git clone --recursive https://github.com/yuzu-emu/yuzu-mainline
+    cd yuzu-mainline
+    mkdir build && cd build
+    cmake .. -GNinja
+    ninja
+    echo finish
+  displayName: 'Run a one-line script'
+
+- script: |
+    echo Add other tasks to build, test, and deploy your project.
+    echo See https://aka.ms/yaml
+  displayName: 'Run a multi-line script'
