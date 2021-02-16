@@ -191,5 +191,4 @@ using TouchDevice = InputDevice<TouchStatus>;
  * The s32s are the mouse wheel.
  */
 using MouseDevice = InputDevice<std::tuple<float, float, s32, s32>>;
-
 } // namespace Input

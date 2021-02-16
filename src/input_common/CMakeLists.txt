@@ -17,6 +17,12 @@ add_library(input_common STATIC
     gcadapter/gc_adapter.h
     gcadapter/gc_poller.cpp
     gcadapter/gc_poller.h
+    joycon/jc_adapter.cpp
+    joycon/jc_adapter.h
+    joycon/jc_poller.cpp
+    joycon/jc_poller.h
+    joycon/hidapii.c
+    joycon/hidapii.h
     mouse/mouse_input.cpp
     mouse/mouse_input.h
     mouse/mouse_poller.cpp

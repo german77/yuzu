@@ -25,11 +25,8 @@ namespace Settings::NativeMotion {
 enum Values : int;
 }
 
-namespace MouseInput {
-class Mouse;
-}
-
 namespace InputCommon {
+class Mouse;
 namespace Polling {
 
 enum class DeviceType { Button, AnalogPreferred, Motion };
@@ -56,14 +53,6 @@ public:
 };
 } // namespace Polling
 
-class GCAnalogFactory;
-class GCButtonFactory;
-class UDPMotionFactory;
-class UDPTouchFactory;
-class MouseButtonFactory;
-class MouseAnalogFactory;
-class MouseMotionFactory;
-class MouseTouchFactory;
 class Keyboard;
 
 /**
@@ -98,10 +87,10 @@ public:
     [[nodiscard]] const Keyboard* GetKeyboard() const;
 
     /// Retrieves the underlying mouse device.
-    [[nodiscard]] MouseInput::Mouse* GetMouse();
+    [[nodiscard]] Mouse* GetMouse();
 
     /// Retrieves the underlying mouse device.
-    [[nodiscard]] const MouseInput::Mouse* GetMouse() const;
+    [[nodiscard]] const Mouse* GetMouse() const;
 
     /**
      * Returns all available input devices that this Factory can create a new device with.
@@ -119,54 +108,6 @@ public:
 
     /// Retrieves the motion mappings for the given device.
     [[nodiscard]] MotionMapping GetMotionMappingForDevice(const Common::ParamPackage& device) const;
-
-    /// Retrieves the underlying GameCube analog handler.
-    [[nodiscard]] GCAnalogFactory* GetGCAnalogs();
-
-    /// Retrieves the underlying GameCube analog handler.
-    [[nodiscard]] const GCAnalogFactory* GetGCAnalogs() const;
-
-    /// Retrieves the underlying GameCube button handler.
-    [[nodiscard]] GCButtonFactory* GetGCButtons();
-
-    /// Retrieves the underlying GameCube button handler.
-    [[nodiscard]] const GCButtonFactory* GetGCButtons() const;
-
-    /// Retrieves the underlying udp motion handler.
-    [[nodiscard]] UDPMotionFactory* GetUDPMotions();
-
-    /// Retrieves the underlying udp motion handler.
-    [[nodiscard]] const UDPMotionFactory* GetUDPMotions() const;
-
-    /// Retrieves the underlying udp touch handler.
-    [[nodiscard]] UDPTouchFactory* GetUDPTouch();
-
-    /// Retrieves the underlying udp touch handler.
-    [[nodiscard]] const UDPTouchFactory* GetUDPTouch() const;
-
-    /// Retrieves the underlying GameCube button handler.
-    [[nodiscard]] MouseButtonFactory* GetMouseButtons();
-
-    /// Retrieves the underlying GameCube button handler.
-    [[nodiscard]] const MouseButtonFactory* GetMouseButtons() const;
-
-    /// Retrieves the underlying udp touch handler.
-    [[nodiscard]] MouseAnalogFactory* GetMouseAnalogs();
-
-    /// Retrieves the underlying udp touch handler.
-    [[nodiscard]] const MouseAnalogFactory* GetMouseAnalogs() const;
-
-    /// Retrieves the underlying udp motion handler.
-    [[nodiscard]] MouseMotionFactory* GetMouseMotions();
-
-    /// Retrieves the underlying udp motion handler.
-    [[nodiscard]] const MouseMotionFactory* GetMouseMotions() const;
-
-    /// Retrieves the underlying udp touch handler.
-    [[nodiscard]] MouseTouchFactory* GetMouseTouch();
-
-    /// Retrieves the underlying udp touch handler.
-    [[nodiscard]] const MouseTouchFactory* GetMouseTouch() const;
 
     /// Reloads the input devices
     void ReloadInputDevices();

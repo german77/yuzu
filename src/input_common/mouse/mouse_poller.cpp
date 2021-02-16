@@ -12,9 +12,9 @@
 
 namespace InputCommon {
 
-class MouseButton final : public Input::ButtonDevice {
+class MouseButtonState final : public Input::ButtonDevice {
 public:
-    explicit MouseButton(u32 button_, const MouseInput::Mouse* mouse_input_)
+    explicit MouseButtonState(u32 button_, const InputCommon::Mouse* mouse_input_)
         : button(button_), mouse_input(mouse_input_) {}
 
     bool GetStatus() const override {
@@ -23,26 +23,26 @@ public:
 
 private:
     const u32 button;
-    const MouseInput::Mouse* mouse_input;
+    const InputCommon::Mouse* mouse_input;
 };
 
-MouseButtonFactory::MouseButtonFactory(std::shared_ptr<MouseInput::Mouse> mouse_input_)
+MouseButtonFactory::MouseButtonFactory(std::shared_ptr<InputCommon::Mouse> mouse_input_)
     : mouse_input(std::move(mouse_input_)) {}
 
 std::unique_ptr<Input::ButtonDevice> MouseButtonFactory::Create(
     const Common::ParamPackage& params) {
     const auto button_id = params.Get("button", 0);
 
-    return std::make_unique<MouseButton>(button_id, mouse_input.get());
+    return std::make_unique<MouseButtonState>(button_id, mouse_input.get());
 }
 
 Common::ParamPackage MouseButtonFactory::GetNextInput() const {
-    MouseInput::MouseStatus pad;
+    InputCommon::MouseStatus pad;
     Common::ParamPackage params;
     auto& queue = mouse_input->GetMouseQueue();
     while (queue.Pop(pad)) {
         // This while loop will break on the earliest detected button
-        if (pad.button != MouseInput::MouseButton::Undefined) {
+        if (pad.button != InputCommon::MouseButton::Undefined) {
             params.Set("engine", "mouse");
             params.Set("button", static_cast<u16>(pad.button));
             return params;
@@ -64,7 +64,7 @@ void MouseButtonFactory::EndConfiguration() {
 class MouseAnalog final : public Input::AnalogDevice {
 public:
     explicit MouseAnalog(u32 port_, u32 axis_x_, u32 axis_y_, bool invert_x_, bool invert_y_,
-                         float deadzone_, float range_, const MouseInput::Mouse* mouse_input_)
+                         float deadzone_, float range_, const InputCommon::Mouse* mouse_input_)
         : button(port_), axis_x(axis_x_), axis_y(axis_y_), invert_x(invert_x_), invert_y(invert_y_),
           deadzone(deadzone_), range(range_), mouse_input(mouse_input_) {}
 
@@ -125,12 +125,12 @@ private:
     const bool invert_y;
     const float deadzone;
     const float range;
-    const MouseInput::Mouse* mouse_input;
+    const InputCommon::Mouse* mouse_input;
     mutable std::mutex mutex;
 };
 
 /// An analog device factory that creates analog devices from GC Adapter
-MouseAnalogFactory::MouseAnalogFactory(std::shared_ptr<MouseInput::Mouse> mouse_input_)
+MouseAnalogFactory::MouseAnalogFactory(std::shared_ptr<InputCommon::Mouse> mouse_input_)
     : mouse_input(std::move(mouse_input_)) {}
 
 /**
@@ -167,12 +167,12 @@ void MouseAnalogFactory::EndConfiguration() {
 }
 
 Common::ParamPackage MouseAnalogFactory::GetNextInput() const {
-    MouseInput::MouseStatus pad;
+    InputCommon::MouseStatus pad;
     Common::ParamPackage params;
     auto& queue = mouse_input->GetMouseQueue();
     while (queue.Pop(pad)) {
         // This while loop will break on the earliest detected button
-        if (pad.button != MouseInput::MouseButton::Undefined) {
+        if (pad.button != InputCommon::MouseButton::Undefined) {
             params.Set("engine", "mouse");
             params.Set("port", static_cast<u16>(pad.button));
             params.Set("axis_x", 0);
@@ -187,7 +187,7 @@ Common::ParamPackage MouseAnalogFactory::GetNextInput() const {
 
 class MouseMotion final : public Input::MotionDevice {
 public:
-    explicit MouseMotion(u32 button_, const MouseInput::Mouse* mouse_input_)
+    explicit MouseMotion(u32 button_, const InputCommon::Mouse* mouse_input_)
         : button(button_), mouse_input(mouse_input_) {}
 
     Input::MotionStatus GetStatus() const override {
@@ -196,10 +196,10 @@ public:
 
 private:
     const u32 button;
-    const MouseInput::Mouse* mouse_input;
+    const InputCommon::Mouse* mouse_input;
 };
 
-MouseMotionFactory::MouseMotionFactory(std::shared_ptr<MouseInput::Mouse> mouse_input_)
+MouseMotionFactory::MouseMotionFactory(std::shared_ptr<InputCommon::Mouse> mouse_input_)
     : mouse_input(std::move(mouse_input_)) {}
 
 std::unique_ptr<Input::MotionDevice> MouseMotionFactory::Create(
@@ -210,12 +210,12 @@ std::unique_ptr<Input::MotionDevice> MouseMotionFactory::Create(
 }
 
 Common::ParamPackage MouseMotionFactory::GetNextInput() const {
-    MouseInput::MouseStatus pad;
+    InputCommon::MouseStatus pad;
     Common::ParamPackage params;
     auto& queue = mouse_input->GetMouseQueue();
     while (queue.Pop(pad)) {
         // This while loop will break on the earliest detected button
-        if (pad.button != MouseInput::MouseButton::Undefined) {
+        if (pad.button != InputCommon::MouseButton::Undefined) {
             params.Set("engine", "mouse");
             params.Set("button", static_cast<u16>(pad.button));
             return params;
@@ -236,7 +236,7 @@ void MouseMotionFactory::EndConfiguration() {
 
 class MouseTouch final : public Input::TouchDevice {
 public:
-    explicit MouseTouch(u32 button_, const MouseInput::Mouse* mouse_input_)
+    explicit MouseTouch(u32 button_, const InputCommon::Mouse* mouse_input_)
         : button(button_), mouse_input(mouse_input_) {}
 
     Input::TouchStatus GetStatus() const override {
@@ -245,10 +245,10 @@ public:
 
 private:
     const u32 button;
-    const MouseInput::Mouse* mouse_input;
+    const InputCommon::Mouse* mouse_input;
 };
 
-MouseTouchFactory::MouseTouchFactory(std::shared_ptr<MouseInput::Mouse> mouse_input_)
+MouseTouchFactory::MouseTouchFactory(std::shared_ptr<InputCommon::Mouse> mouse_input_)
     : mouse_input(std::move(mouse_input_)) {}
 
 std::unique_ptr<Input::TouchDevice> MouseTouchFactory::Create(const Common::ParamPackage& params) {
@@ -258,12 +258,12 @@ std::unique_ptr<Input::TouchDevice> MouseTouchFactory::Create(const Common::Para
 }
 
 Common::ParamPackage MouseTouchFactory::GetNextInput() const {
-    MouseInput::MouseStatus pad;
+    InputCommon::MouseStatus pad;
     Common::ParamPackage params;
     auto& queue = mouse_input->GetMouseQueue();
     while (queue.Pop(pad)) {
         // This while loop will break on the earliest detected button
-        if (pad.button != MouseInput::MouseButton::Undefined) {
+        if (pad.button != InputCommon::MouseButton::Undefined) {
             params.Set("engine", "mouse");
             params.Set("button", static_cast<u16>(pad.button));
             return params;

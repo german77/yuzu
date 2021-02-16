@@ -7,15 +7,14 @@
 #include "common/param_package.h"
 #include "input_common/analog_from_button.h"
 #include "input_common/gcadapter/gc_adapter.h"
-#include "input_common/gcadapter/gc_poller.h"
 #include "input_common/keyboard.h"
 #include "input_common/main.h"
 #include "input_common/motion_from_button.h"
 #include "input_common/mouse/mouse_input.h"
 #include "input_common/mouse/mouse_poller.h"
 #include "input_common/touch_from_button.h"
+#include "input_common/joycon/jc_adapter.h"
 #include "input_common/udp/client.h"
-#include "input_common/udp/udp.h"
 #ifdef HAVE_SDL2
 #include "input_common/sdl/sdl.h"
 #endif
@@ -24,76 +23,25 @@ namespace InputCommon {
 
 struct InputSubsystem::Impl {
     void Initialize() {
-        gcadapter = std::make_shared<GCAdapter::Adapter>();
-        gcbuttons = std::make_shared<GCButtonFactory>(gcadapter);
-        Input::RegisterFactory<Input::ButtonDevice>("gcpad", gcbuttons);
-        gcanalog = std::make_shared<GCAnalogFactory>(gcadapter);
-        Input::RegisterFactory<Input::AnalogDevice>("gcpad", gcanalog);
-        gcvibration = std::make_shared<GCVibrationFactory>(gcadapter);
-        Input::RegisterFactory<Input::VibrationDevice>("gcpad", gcvibration);
-
-        keyboard = std::make_shared<Keyboard>();
-        Input::RegisterFactory<Input::ButtonDevice>("keyboard", keyboard);
-        Input::RegisterFactory<Input::AnalogDevice>("analog_from_button",
-                                                    std::make_shared<AnalogFromButton>());
-        Input::RegisterFactory<Input::MotionDevice>("keyboard",
-                                                    std::make_shared<MotionFromButton>());
-        Input::RegisterFactory<Input::TouchDevice>("touch_from_button",
-                                                   std::make_shared<TouchFromButtonFactory>());
+        //jcadapter = JCAdapter::Init();
+        //gcadapter = GCAdapter::Init();
+        //udp = CemuhookUDP::Init();
+        //mouse = Mouse::Init();
+        mouse = std::make_shared<Mouse>();
 
 #ifdef HAVE_SDL2
         sdl = SDL::Init();
 #endif
-
-        udp = std::make_shared<InputCommon::CemuhookUDP::Client>();
-        udpmotion = std::make_shared<UDPMotionFactory>(udp);
-        Input::RegisterFactory<Input::MotionDevice>("cemuhookudp", udpmotion);
-        udptouch = std::make_shared<UDPTouchFactory>(udp);
-        Input::RegisterFactory<Input::TouchDevice>("cemuhookudp", udptouch);
-
-        mouse = std::make_shared<MouseInput::Mouse>();
-        mousebuttons = std::make_shared<MouseButtonFactory>(mouse);
-        Input::RegisterFactory<Input::ButtonDevice>("mouse", mousebuttons);
-        mouseanalog = std::make_shared<MouseAnalogFactory>(mouse);
-        Input::RegisterFactory<Input::AnalogDevice>("mouse", mouseanalog);
-        mousemotion = std::make_shared<MouseMotionFactory>(mouse);
-        Input::RegisterFactory<Input::MotionDevice>("mouse", mousemotion);
-        mousetouch = std::make_shared<MouseTouchFactory>(mouse);
-        Input::RegisterFactory<Input::TouchDevice>("mouse", mousetouch);
     }
 
     void Shutdown() {
-        Input::UnregisterFactory<Input::ButtonDevice>("keyboard");
-        Input::UnregisterFactory<Input::MotionDevice>("keyboard");
-        keyboard.reset();
-        Input::UnregisterFactory<Input::AnalogDevice>("analog_from_button");
-        Input::UnregisterFactory<Input::TouchDevice>("touch_from_button");
+        //jcadapter.reset();
+        //gcadapter.reset();
+        //udp.reset();
+        mouse.reset();
 #ifdef HAVE_SDL2
         sdl.reset();
 #endif
-        Input::UnregisterFactory<Input::ButtonDevice>("gcpad");
-        Input::UnregisterFactory<Input::AnalogDevice>("gcpad");
-        Input::UnregisterFactory<Input::VibrationDevice>("gcpad");
-
-        gcbuttons.reset();
-        gcanalog.reset();
-        gcvibration.reset();
-
-        Input::UnregisterFactory<Input::MotionDevice>("cemuhookudp");
-        Input::UnregisterFactory<Input::TouchDevice>("cemuhookudp");
-
-        udpmotion.reset();
-        udptouch.reset();
-
-        Input::UnregisterFactory<Input::ButtonDevice>("mouse");
-        Input::UnregisterFactory<Input::AnalogDevice>("mouse");
-        Input::UnregisterFactory<Input::MotionDevice>("mouse");
-        Input::UnregisterFactory<Input::TouchDevice>("mouse");
-
-        mousebuttons.reset();
-        mouseanalog.reset();
-        mousemotion.reset();
-        mousetouch.reset();
     }
 
     [[nodiscard]] std::vector<Common::ParamPackage> GetInputDevices() const {
@@ -102,13 +50,15 @@ struct InputSubsystem::Impl {
             Common::ParamPackage{{"display", "Keyboard/Mouse"}, {"class", "keyboard"}},
         };
 #ifdef HAVE_SDL2
-        auto sdl_devices = sdl->GetInputDevices();
+        const auto sdl_devices = sdl->GetInputDevices();
         devices.insert(devices.end(), sdl_devices.begin(), sdl_devices.end());
 #endif
-        auto udp_devices = udp->GetInputDevices();
-        devices.insert(devices.end(), udp_devices.begin(), udp_devices.end());
-        auto gcpad_devices = gcadapter->GetInputDevices();
-        devices.insert(devices.end(), gcpad_devices.begin(), gcpad_devices.end());
+        //const auto udp_devices = udp->GetInputDevices();
+        //devices.insert(devices.end(), udp_devices.begin(), udp_devices.end());
+        //const auto gcpad_devices = gcadapter->GetInputDevices();
+        //devices.insert(devices.end(), gcpad_devices.begin(), gcpad_devices.end());
+        //const auto jcpad_devices = jcadapter->GetInputDevices();
+        //devices.insert(devices.end(), jcpad_devices.begin(), jcpad_devices.end());
         return devices;
     }
 
@@ -117,9 +67,12 @@ struct InputSubsystem::Impl {
         if (!params.Has("class") || params.Get("class", "") == "any") {
             return {};
         }
-        if (params.Get("class", "") == "gcpad") {
-            return gcadapter->GetAnalogMappingForDevice(params);
-        }
+        //if (params.Get("class", "") == "gcpad") {
+        //    return gcadapter->GetAnalogMappingForDevice(params);
+        //}
+        //if (params.Get("class", "") == "jcpad") {
+        //    return jcadapter->GetAnalogMappingForDevice(params);
+        //}
 #ifdef HAVE_SDL2
         if (params.Get("class", "") == "sdl") {
             return sdl->GetAnalogMappingForDevice(params);
@@ -133,9 +86,12 @@ struct InputSubsystem::Impl {
         if (!params.Has("class") || params.Get("class", "") == "any") {
             return {};
         }
-        if (params.Get("class", "") == "gcpad") {
-            return gcadapter->GetButtonMappingForDevice(params);
-        }
+        //if (params.Get("class", "") == "gcpad") {
+        //    return gcadapter->GetButtonMappingForDevice(params);
+        //}
+        //if (params.Get("class", "") == "jcpad") {
+        //    return jcadapter->GetButtonMappingForDevice(params);
+        //}
 #ifdef HAVE_SDL2
         if (params.Get("class", "") == "sdl") {
             return sdl->GetButtonMappingForDevice(params);
@@ -160,18 +116,10 @@ struct InputSubsystem::Impl {
 #ifdef HAVE_SDL2
     std::unique_ptr<SDL::State> sdl;
 #endif
-    std::shared_ptr<GCButtonFactory> gcbuttons;
-    std::shared_ptr<GCAnalogFactory> gcanalog;
-    std::shared_ptr<GCVibrationFactory> gcvibration;
-    std::shared_ptr<UDPMotionFactory> udpmotion;
-    std::shared_ptr<UDPTouchFactory> udptouch;
-    std::shared_ptr<MouseButtonFactory> mousebuttons;
-    std::shared_ptr<MouseAnalogFactory> mouseanalog;
-    std::shared_ptr<MouseMotionFactory> mousemotion;
-    std::shared_ptr<MouseTouchFactory> mousetouch;
-    std::shared_ptr<CemuhookUDP::Client> udp;
-    std::shared_ptr<GCAdapter::Adapter> gcadapter;
-    std::shared_ptr<MouseInput::Mouse> mouse;
+    //std::shared_ptr<JCAdapter::State> jcadapter;
+    //std::shared_ptr<CemuhookUDP::State> udp;
+    //std::shared_ptr<GCAdapter::State> gcadapter;
+    std::shared_ptr<Mouse> mouse;
 };
 
 InputSubsystem::InputSubsystem() : impl{std::make_unique<Impl>()} {}
@@ -194,11 +142,11 @@ const Keyboard* InputSubsystem::GetKeyboard() const {
     return impl->keyboard.get();
 }
 
-MouseInput::Mouse* InputSubsystem::GetMouse() {
+Mouse* InputSubsystem::GetMouse() {
     return impl->mouse.get();
 }
 
-const MouseInput::Mouse* InputSubsystem::GetMouse() const {
+const Mouse* InputSubsystem::GetMouse() const {
     return impl->mouse.get();
 }
 
@@ -218,84 +166,29 @@ MotionMapping InputSubsystem::GetMotionMappingForDevice(const Common::ParamPacka
     return impl->GetMotionMappingForDevice(device);
 }
 
-GCAnalogFactory* InputSubsystem::GetGCAnalogs() {
-    return impl->gcanalog.get();
-}
-
-const GCAnalogFactory* InputSubsystem::GetGCAnalogs() const {
-    return impl->gcanalog.get();
-}
-
-GCButtonFactory* InputSubsystem::GetGCButtons() {
-    return impl->gcbuttons.get();
-}
-
-const GCButtonFactory* InputSubsystem::GetGCButtons() const {
-    return impl->gcbuttons.get();
-}
-
-UDPMotionFactory* InputSubsystem::GetUDPMotions() {
-    return impl->udpmotion.get();
-}
-
-const UDPMotionFactory* InputSubsystem::GetUDPMotions() const {
-    return impl->udpmotion.get();
-}
-
-UDPTouchFactory* InputSubsystem::GetUDPTouch() {
-    return impl->udptouch.get();
-}
-
-const UDPTouchFactory* InputSubsystem::GetUDPTouch() const {
-    return impl->udptouch.get();
-}
-
-MouseButtonFactory* InputSubsystem::GetMouseButtons() {
-    return impl->mousebuttons.get();
-}
-
-const MouseButtonFactory* InputSubsystem::GetMouseButtons() const {
-    return impl->mousebuttons.get();
-}
-
-MouseAnalogFactory* InputSubsystem::GetMouseAnalogs() {
-    return impl->mouseanalog.get();
-}
-
-const MouseAnalogFactory* InputSubsystem::GetMouseAnalogs() const {
-    return impl->mouseanalog.get();
-}
-
-MouseMotionFactory* InputSubsystem::GetMouseMotions() {
-    return impl->mousemotion.get();
-}
-
-const MouseMotionFactory* InputSubsystem::GetMouseMotions() const {
-    return impl->mousemotion.get();
-}
-
-MouseTouchFactory* InputSubsystem::GetMouseTouch() {
-    return impl->mousetouch.get();
-}
-
-const MouseTouchFactory* InputSubsystem::GetMouseTouch() const {
-    return impl->mousetouch.get();
-}
-
 void InputSubsystem::ReloadInputDevices() {
-    if (!impl->udp) {
-        return;
-    }
-    impl->udp->ReloadSockets();
+    //if (!impl->udp) {
+    //    return;
+    //}
+    //impl->udp->ReloadSockets();
 }
 
 std::vector<std::unique_ptr<Polling::DevicePoller>> InputSubsystem::GetPollers(
     Polling::DeviceType type) const {
+    std::vector<std::unique_ptr<Polling::DevicePoller>> pollers;
+    //const auto udp_pollers = impl->udp->GetPollers(type);
+    //pollers.insert(pollers.end(), udp_pollers.begin(), udp_pollers.end());
+    //const auto gcpad_pollers = impl->gcadapter->GetPollers(type);
+    //pollers.insert(pollers.end(), gcpad_pollers.begin(), gcpad_pollers.end());
+    //const auto jcpad_pollers = impl->jcadapter->GetPollers(type);
+    //pollers.insert(pollers.end(), jcpad_pollers.begin(), jcpad_pollers.end());
+    //const auto mouse_pollers = impl->mouse->GetPollers(type);
+    //pollers.insert(pollers.end(), mouse_pollers.begin(), mouse_pollers.end());
 #ifdef HAVE_SDL2
-    return impl->sdl->GetPollers(type);
-#else
-    return {};
+    const auto sdl_pollers = impl->sdl->GetPollers(type);
+    pollers.insert(pollers.end(), sdl_pollers.begin(), sdl_pollers.end());
 #endif
+    return pollers;
 }
 
 std::string GenerateKeyboardParam(int key_code) {

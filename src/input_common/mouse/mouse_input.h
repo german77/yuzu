@@ -13,8 +13,15 @@
 #include "common/vector_math.h"
 #include "core/frontend/input.h"
 #include "input_common/motion_input.h"
+#include "input_common/main.h"
 
-namespace MouseInput {
+namespace InputCommon {
+using Pollers = std::vector<std::unique_ptr<Polling::DevicePoller>>;
+
+class MouseAnalogFactory;
+class MouseButtonFactory;
+class MouseMotionFactory;
+class MouseTouchFactory;
 
 enum class MouseButton {
     Left,
@@ -45,6 +52,8 @@ public:
     void BeginConfiguration();
     void EndConfiguration();
 
+    void Reset();
+
     /**
      * Signals that a button is pressed.
      * @param x the x-coordinate of the cursor
@@ -73,7 +82,9 @@ public:
     [[nodiscard]] MouseData& GetMouseState(std::size_t button);
     [[nodiscard]] const MouseData& GetMouseState(std::size_t button) const;
 
-private:
+    //Pollers GetPollers(InputCommon::Polling::DeviceType type);
+
+    private:
     void UpdateThread();
     void UpdateYuzuSettings();
     void StopPanning();
@@ -91,6 +102,11 @@ private:
         MouseData data;
     };
 
+    std::shared_ptr<MouseButtonFactory> button_factory;
+    std::shared_ptr<MouseAnalogFactory> analog_factory;
+    std::shared_ptr<MouseMotionFactory> motion_factory;
+    std::shared_ptr<MouseTouchFactory> touch_factory;
+
     u16 buttons{};
     std::thread update_thread;
     MouseButton last_button{MouseButton::Undefined};
@@ -100,4 +116,4 @@ private:
     bool update_thread_running{true};
     int mouse_panning_timout{};
 };
-} // namespace MouseInput
+} // namespace InputCommon::Mouse

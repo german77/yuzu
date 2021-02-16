@@ -3,11 +3,23 @@
 // Refer to the license.txt file included.
 
 #include "core/settings.h"
+#include "core/frontend/input.h"
+#include "input_common/mouse/mouse_poller.h"
 #include "input_common/mouse/mouse_input.h"
 
-namespace MouseInput {
+namespace InputCommon {
 
 Mouse::Mouse() {
+    using namespace Input;
+    button_factory = std::make_shared<MouseButtonFactory>(*this);
+    analog_factory = std::make_shared<MouseAnalogFactory>(*this);
+    motion_factory = std::make_shared<MouseMotionFactory>(*this);
+    touch_factory = std::make_shared<MouseTouchFactory>(*this);
+    RegisterFactory<ButtonDevice>("mouse", button_factory);
+    RegisterFactory<AnalogDevice>("mouse", analog_factory);
+    RegisterFactory<MotionDevice>("mouse", motion_factory);
+    RegisterFactory<TouchDevice>("mouse", touch_factory);
+
     update_thread = std::thread(&Mouse::UpdateThread, this);
 }
 
@@ -16,6 +28,20 @@ Mouse::~Mouse() {
     if (update_thread.joinable()) {
         update_thread.join();
     }
+}
+
+void Mouse::Reset() {
+    using namespace Input;
+    UnregisterFactory<ButtonDevice>("mouse");
+    UnregisterFactory<AnalogDevice>("mouse");
+    UnregisterFactory<MotionDevice>("mouse");
+    UnregisterFactory<TouchDevice>("mouse");
+
+    button_factory.reset();
+    analog_factory.reset();
+    motion_factory.reset();
+    touch_factory.reset();
+
 }
 
 void Mouse::UpdateThread() {
@@ -172,4 +198,22 @@ MouseData& Mouse::GetMouseState(std::size_t button) {
 const MouseData& Mouse::GetMouseState(std::size_t button) const {
     return mouse_info[button].data;
 }
+
+//Pollers Mouse::GetPollers(InputCommon::Polling::DeviceType type) {
+//    Pollers pollers;
+//
+//    //switch (type) {
+//    //case InputCommon::Polling::DeviceType::AnalogPreferred:
+//    //    pollers.emplace_back(std::make_unique<Polling::SDLAnalogPreferredPoller>(*this));
+//    //    break;
+//    //case InputCommon::Polling::DeviceType::Button:
+//    //    pollers.emplace_back(std::make_unique<Polling::SDLButtonPoller>(*this));
+//    //    break;
+//    //case InputCommon::Polling::DeviceType::Motion:
+//    //    pollers.emplace_back(std::make_unique<Polling::SDLMotionPoller>(*this));
+//    //    break;
+//    //}
+//
+//    return pollers;
+//}
 } // namespace MouseInput
