@@ -215,6 +215,14 @@ void SDLState::InitJoystick(int joystick_index) {
 
     if (SDL_IsGameController(joystick_index)) {
         sdl_gamecontroller = SDL_GameControllerOpen(joystick_index);
+        if (SDL_GameControllerHasSensor(sdl_gamecontroller, SDL_SENSOR_ACCEL)) {
+            LOG_ERROR(Input, "This controller supports accelerometer");
+            SDL_GameControllerSetSensorEnabled(sdl_gamecontroller, SDL_SENSOR_ACCEL, SDL_TRUE);
+        }
+        if (SDL_GameControllerHasSensor(sdl_gamecontroller, SDL_SENSOR_GYRO)) {
+            LOG_ERROR(Input, "This controller supports gyro");
+            SDL_GameControllerSetSensorEnabled(sdl_gamecontroller, SDL_SENSOR_GYRO, SDL_TRUE);
+        }
     }
 
     if (!sdl_joystick) {
@@ -286,6 +294,16 @@ void SDLState::HandleGameControllerEvent(const SDL_Event& event) {
         }
         break;
     }
+    case SDL_SENSORUPDATE:
+        switch (event.csensor.type) {
+        case SDL_SENSOR_ACCEL:
+            LOG_ERROR(Input, "Accel {}", event.csensor.data[0]);
+            break;
+        case SDL_SENSOR_GYRO:
+            LOG_ERROR(Input, "Gyro {}", event.csensor.data[0]);
+            break;
+        }
+        break;
     case SDL_JOYDEVICEREMOVED:
         LOG_DEBUG(Input, "Controller removed with Instance_ID {}", event.jdevice.which);
         CloseJoystick(SDL_JoystickFromInstanceID(event.jdevice.which));
@@ -707,10 +725,15 @@ SDLState::SDLState() {
     RegisterFactory<VibrationDevice>("sdl", vibration_factory);
     RegisterFactory<MotionDevice>("sdl", motion_factory);
 
+    SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0");
+    SDL_SetHint(SDL_HINT_AUTO_UPDATE_SENSORS, "1");
+    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+
     // If the frontend is going to manage the event loop, then we don't start one here
     start_thread = SDL_WasInit(SDL_INIT_JOYSTICK) == 0;
-    if (start_thread && SDL_Init(SDL_INIT_JOYSTICK) < 0) {
-        LOG_CRITICAL(Input, "SDL_Init(SDL_INIT_JOYSTICK) failed with: {}", SDL_GetError());
+    if (start_thread && SDL_Init(SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) < 0) {
+        LOG_CRITICAL(Input, "SDL_Init(SDL_INIT_JOYSTICK| SDL_INIT_GAMECONTROLLER) failed with: {}",
+                     SDL_GetError());
         return;
     }
     has_gamecontroller = SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) != 0;
@@ -760,8 +783,35 @@ std::vector<Common::ParamPackage> SDLState::GetInputDevices() {
     for (const auto& [key, value] : joystick_map) {
         for (const auto& joystick : value) {
             if (auto* const controller = joystick->GetSDLGameController()) {
-                std::string name =
-                    fmt::format("{} {}", SDL_GameControllerName(controller), joystick->GetPort());
+                std::string name;
+
+                switch (SDL_GameControllerGetType(controller)) {
+                case SDL_CONTROLLER_TYPE_XBOX360:
+                    name = "XBox 360 Controller";
+                    break;
+                case SDL_CONTROLLER_TYPE_XBOXONE:
+                    name = "XBox One Controller";
+                    break;
+                case SDL_CONTROLLER_TYPE_PS3:
+                    name = "PS3 Controller";
+                    break;
+                case SDL_CONTROLLER_TYPE_PS4:
+                    name = "PS4 Controller";
+                    break;
+                case SDL_CONTROLLER_TYPE_PS5:
+                    name = "PS5 Controller";
+                    break;
+                case SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_PRO:
+                    name = "Pro Controller";
+                    break;
+                case SDL_CONTROLLER_TYPE_VIRTUAL:
+                    name = "Virtual Game Controller";
+                    break;
+                default:
+                    name = SDL_GameControllerName(controller);
+                    break;
+                }
+                name = fmt::format("{} {}", name, joystick->GetPort());
                 devices.emplace_back(Common::ParamPackage{
                     {"class", "sdl"},
                     {"display", std::move(name)},
@@ -929,17 +979,23 @@ ButtonMapping SDLState::GetButtonMappingForDevice(const Common::ParamPackage& pa
     if (controller == nullptr) {
         return {};
     }
+    const bool is_pro_controller =
+        SDL_GameControllerGetType(controller) == SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_PRO;
 
     // This list is missing ZL/ZR since those are not considered buttons in SDL GameController.
     // We will add those afterwards
     // This list also excludes Screenshot since theres not really a mapping for that
     using ButtonBindings =
         std::array<std::pair<Settings::NativeButton::Values, SDL_GameControllerButton>, 17>;
-    static constexpr ButtonBindings switch_to_sdl_button{{
-        {Settings::NativeButton::A, SDL_CONTROLLER_BUTTON_B},
-        {Settings::NativeButton::B, SDL_CONTROLLER_BUTTON_A},
-        {Settings::NativeButton::X, SDL_CONTROLLER_BUTTON_Y},
-        {Settings::NativeButton::Y, SDL_CONTROLLER_BUTTON_X},
+    const ButtonBindings switch_to_sdl_button{{
+        {Settings::NativeButton::A,
+         is_pro_controller ? SDL_CONTROLLER_BUTTON_A : SDL_CONTROLLER_BUTTON_B},
+        {Settings::NativeButton::B,
+         is_pro_controller ? SDL_CONTROLLER_BUTTON_B : SDL_CONTROLLER_BUTTON_A},
+        {Settings::NativeButton::X,
+         is_pro_controller ? SDL_CONTROLLER_BUTTON_X : SDL_CONTROLLER_BUTTON_Y},
+        {Settings::NativeButton::Y,
+         is_pro_controller ? SDL_CONTROLLER_BUTTON_Y : SDL_CONTROLLER_BUTTON_X},
         {Settings::NativeButton::LStick, SDL_CONTROLLER_BUTTON_LEFTSTICK},
         {Settings::NativeButton::RStick, SDL_CONTROLLER_BUTTON_RIGHTSTICK},
         {Settings::NativeButton::L, SDL_CONTROLLER_BUTTON_LEFTSHOULDER},
