@@ -20,14 +20,14 @@ namespace TasInput {
 
     Tas::Tas() {
         LoadTasFile();
-        update_thread = std::thread(&Tas::UpdateThread, this);
+        //update_thread = std::thread(&Tas::UpdateThread, this);
     }
 
     Tas::~Tas() {
         update_thread_running = false;
-        if (update_thread.joinable()) {
+        /*if (update_thread.joinable()) {
             update_thread.join();
-        }
+        }*/
     }
 
     void Tas::RefreshTasFile() {
@@ -109,6 +109,7 @@ namespace TasInput {
     }
 
     void Tas::RecordInput(u32 buttons, std::array<std::pair<float, float>, 2> axes, bool changed) {
+        UpdateThread();
         if (!Settings::values.tas_record) {
             return;
         }
@@ -127,14 +128,14 @@ namespace TasInput {
 
     void Tas::UpdateThread() {
         constexpr int update_time = 16;
-        while (update_thread_running) {
+        if (update_thread_running) {
             /*if (refresh_tas_fle) {
                 LoadTasFile();
                 refresh_tas_fle = false;
                 current_command = 0;
             }*/
-            if (!Settings::values.tas_record) {
-                if (!input_commands.empty()) {
+            //if (!Settings::values.tas_record) {
+                if (!Settings::values.tas_record && !input_commands.empty()) {
                     WriteTasFile();
                     Settings::values.tas_reset = true;
                     refresh_tas_fle = true;
@@ -182,8 +183,8 @@ namespace TasInput {
                     tas_data[0].buttons = 0;
                     tas_data[0].axis = {};
                 }
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(update_time));
+            //}
+            //std::this_thread::sleep_for(std::chrono::milliseconds(update_time));
         }
     }
 
