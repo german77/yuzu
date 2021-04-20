@@ -8,8 +8,12 @@
 #include "common/settings.h"
 #include "yuzu/configuration/configure_input_player_widget.h"
 #include "yuzu/debugger/controller.h"
+#include "input_common/main.h"
+#include "input_common/tas/tas_input.h"
 
-ControllerDialog::ControllerDialog(QWidget* parent) : QWidget(parent, Qt::Dialog) {
+
+ControllerDialog::ControllerDialog(QWidget* parent, InputCommon::InputSubsystem* input_subsystem_)
+    : QWidget(parent, Qt::Dialog), input_subsystem{input_subsystem_} {
     setObjectName(QStringLiteral("Controller"));
     setWindowTitle(tr("Controller P1"));
     resize(500, 350);
@@ -30,6 +34,10 @@ ControllerDialog::ControllerDialog(QWidget* parent) : QWidget(parent, Qt::Dialog
     setFocusProxy(widget);
     widget->setFocusPolicy(Qt::StrongFocus);
     widget->setFocus();
+
+    watcher = new QFileSystemWatcher(this);
+    watcher->addPath(tr(Settings::values.tas_path.c_str()));
+    connect(watcher, &QFileSystemWatcher::fileChanged, this, &ControllerDialog::RefreshTasFile);
 }
 
 void ControllerDialog::refreshConfiguration() {
@@ -38,6 +46,8 @@ void ControllerDialog::refreshConfiguration() {
     widget->SetPlayerInputRaw(player, players[player].buttons, players[player].analogs);
     widget->SetConnectedStatus(players[player].connected);
     widget->SetControllerType(players[player].controller_type);
+    ControllerCallback callback{[this](ControllerInput input) { InputController(input); }};
+    widget->SetCallBack(callback);
 }
 
 QAction* ControllerDialog::toggleViewAction() {
@@ -63,4 +73,18 @@ void ControllerDialog::hideEvent(QHideEvent* ev) {
         toggle_view_action->setChecked(isVisible());
     }
     QWidget::hideEvent(ev);
+}
+
+void ControllerDialog::RefreshTasFile() {
+    input_subsystem->GetTas()->RefreshTasFile();
+}
+
+void ControllerDialog::InputController(ControllerInput input) {
+    u32 buttons = 0;
+    int index = 0;
+    for (bool btn : input.button_values) {
+        buttons += (btn ? 1 : 0) << index;
+        index++;
+    }
+    input_subsystem->GetTas()->RecordInput(buttons, input.axis_values, input.changed);
 }

@@ -9,6 +9,7 @@
 #include <QPointer>
 #include "common/settings.h"
 #include "core/frontend/input.h"
+#include "yuzu/debugger/controller.h"
 
 class QLabel;
 
@@ -20,6 +21,15 @@ class PlayerControlPreview : public QFrame {
     Q_OBJECT
 
 public:
+    struct AxisValue {
+        QPointF value{};
+        QPointF raw_value{};
+        Input::AnalogProperties properties{};
+        int size{};
+        QPoint offset{};
+        bool active{};
+    };
+
     explicit PlayerControlPreview(QWidget* parent);
     ~PlayerControlPreview() override;
 
@@ -33,6 +43,7 @@ public:
     void BeginMappingAnalog(std::size_t button_id);
     void EndMapping();
     void UpdateInput();
+    void SetCallBack(ControllerCallback callback_);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -59,15 +70,6 @@ private:
         ZL,
         ZR,
         SR,
-    };
-
-    struct AxisValue {
-        QPointF value{};
-        QPointF raw_value{};
-        Input::AnalogProperties properties{};
-        int size{};
-        QPoint offset{};
-        bool active{};
     };
 
     struct LedPattern {
@@ -176,6 +178,7 @@ private:
     using StickArray =
         std::array<std::unique_ptr<Input::AnalogDevice>, Settings::NativeAnalog::NUM_STICKS_HID>;
 
+    ControllerCallback controller_callback;
     bool mapping_active{};
     int blink_counter{};
     QColor button_color{};
