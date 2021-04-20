@@ -862,7 +862,7 @@ void GMainWindow::InitializeDebugWidgets() {
     waitTreeWidget->hide();
     debug_menu->addAction(waitTreeWidget->toggleViewAction());
 
-    controller_dialog = new ControllerDialog(this);
+    controller_dialog = new ControllerDialog(this, input_subsystem.get());
     controller_dialog->hide();
     debug_menu->addAction(controller_dialog->toggleViewAction());
 
@@ -1030,6 +1030,19 @@ void GMainWindow::InitializeHotkeys() {
                     render_window->installEventFilter(render_window);
                     render_window->setAttribute(Qt::WA_Hover, true);
                 }
+            });
+    connect(hotkey_registry.GetHotkey(main_window, QStringLiteral("TAS Start/Stop"), this),
+            &QShortcut::activated, this, [&] {
+                Settings::values.tas_enable = !Settings::values.tas_enable;
+                LOG_INFO(Frontend, "Tas enabled {}", Settings::values.tas_enable);
+            });
+
+    connect(hotkey_registry.GetHotkey(main_window, QStringLiteral("TAS Reset"), this),
+            &QShortcut::activated, this, [&] { Settings::values.tas_reset = true; });
+    connect(hotkey_registry.GetHotkey(main_window, QStringLiteral("TAS Record"), this),
+            &QShortcut::activated, this, [&] {
+                Settings::values.tas_record = !Settings::values.tas_record;
+                LOG_INFO(Frontend, "Tas recording {}", Settings::values.tas_record);
             });
 }
 
