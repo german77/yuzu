@@ -14,6 +14,7 @@
 
 #include "common/common_types.h"
 #include "common/settings_input.h"
+#include <input_common/main.h>
 
 namespace Settings {
 
@@ -169,6 +170,7 @@ struct Values {
 
     // Controls
     InputSetting<std::array<PlayerInput, 10>> players;
+    std::shared_ptr<InputCommon::InputSubsystem> inputSubsystem = NULL;
 
     Setting<bool> use_docked_mode;
 

@@ -214,6 +214,7 @@ GMainWindow::GMainWindow()
     : input_subsystem{std::make_shared<InputCommon::InputSubsystem>()},
       config{std::make_unique<Config>()}, vfs{std::make_shared<FileSys::RealVfsFilesystem>()},
       provider{std::make_unique<FileSys::ManualContentProvider>()} {
+    Settings::values.inputSubsystem = input_subsystem;
     InitializeLogging();
 
     LoadTranslation();
