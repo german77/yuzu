@@ -60,6 +60,7 @@ public:
     void RefreshTasFile();
     void LoadTasFile();
     void RecordInput(u32 buttons, std::array<std::pair<float, float>, 2> axes, bool changed);
+    void UpdateThread();
 
     InputCommon::ButtonMapping GetButtonMappingForDevice(const Common::ParamPackage& params) const;
     InputCommon::AnalogMapping GetAnalogMappingForDevice(const Common::ParamPackage& params) const;
@@ -67,12 +68,10 @@ public:
     [[nodiscard]] const TasData& GetTasState(std::size_t pad) const;
 
 private:
-    struct Command {
-        u32 press_buttons{};
-        u32 release_buttons{};
-        TasAnalog r_axis{};
+    struct TASCommand {
+        u32 buttons{};
         TasAnalog l_axis{};
-        u32 wait{};
+        TasAnalog r_axis{};
     };
     struct InputCommand {
         u32 buttons{};
@@ -80,22 +79,15 @@ private:
         u32 wait{};
     };
     void WriteTasFile();
-    void UpdateThread();
-    u32 ReadCommandPress(const std::string line) const;
-    u32 ReadCommandRelease(const std::string line) const;
-    TasAnalog ReadCommandRaxis(const std::string line) const;
-    TasAnalog ReadCommandLaxis(const std::string line) const;
-    u32 ReadCommandWait(const std::string line) const;
+    TasAnalog ReadCommandAxis(const std::string line) const;
     u32 ReadCommandButtons(const std::string line) const;
     std::string WriteCommandButtons(u32 data) const;
 
-    std::thread update_thread;
     std::array<TasData, 7> tas_data;
     bool update_thread_running{true};
     bool refresh_tas_fle{false};
-    std::vector<Command> commands{};
+    std::vector<TASCommand> newCommands{};
     std::vector<InputCommand> input_commands{};
     std::size_t current_command{0};
-    u32 wait_for{0};
 };
 } // namespace TasInput
