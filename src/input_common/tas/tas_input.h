@@ -14,7 +14,7 @@
 
 namespace TasInput {
 
-using TasAnalog = std::tuple<float, float, bool>;
+using TasAnalog = std::tuple<float, float>;
 
 enum class TasButton {
     BUTTON_A = 0x000001,
@@ -59,7 +59,7 @@ public:
 
     void RefreshTasFile();
     void LoadTasFile();
-    void RecordInput(u32 buttons, std::array<std::pair<float, float>, 2> axes, bool changed);
+    void RecordInput(u32 buttons, std::array<std::pair<float, float>, 2> axes);
     void UpdateThread();
 
     InputCommon::ButtonMapping GetButtonMappingForDevice(const Common::ParamPackage& params) const;
@@ -73,21 +73,18 @@ private:
         TasAnalog l_axis{};
         TasAnalog r_axis{};
     };
-    struct InputCommand {
-        u32 buttons{};
-        std::array<std::pair<float, float>, 2> axes{};
-        u32 wait{};
-    };
     void WriteTasFile();
     TasAnalog ReadCommandAxis(const std::string line) const;
     u32 ReadCommandButtons(const std::string line) const;
     std::string WriteCommandButtons(u32 data) const;
+    std::string WriteCommandAxis(TasAnalog data) const;
+    std::pair<float, float> flipY(std::pair<float, float> old) const;
 
     std::array<TasData, 7> tas_data;
     bool update_thread_running{true};
     bool refresh_tas_fle{false};
     std::vector<TASCommand> newCommands{};
-    std::vector<InputCommand> input_commands{};
+    std::vector<TASCommand> recordCommands{};
     std::size_t current_command{0};
 };
 } // namespace TasInput
