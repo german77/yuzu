@@ -20,39 +20,49 @@ namespace TasInput {
 
     Tas::Tas() {
         LoadTasFile();
-        //update_thread = std::thread(&Tas::UpdateThread, this);
     }
 
     Tas::~Tas() {
         update_thread_running = false;
-        /*if (update_thread.joinable()) {
-            update_thread.join();
-        }*/
     }
 
     void Tas::RefreshTasFile() {
         refresh_tas_fle = true;
     }
     void Tas::LoadTasFile() {
-        if (!commands.empty()) {
-            commands.clear();
+        if (!newCommands.empty()) {
+            newCommands.clear();
         }
         std::string file = "";
         LOG_ERROR(Input, "file reloaded {}", Common::FS::ReadFileToString(true, Settings::values.tas_path, file));
         std::stringstream command_line(file);
         std::string line;
+        int frameNo = 0;
+        TASCommand empty = {.buttons = 0, .l_axis = {0.f, 0.f, true}, .r_axis = {0.f, 0.f, true}};
         while (std::getline(command_line, line, '\n')) {
             std::smatch m;
-            Command command = {
-                .press_buttons = ReadCommandPress(line),
-                .release_buttons = ReadCommandRelease(line),
-                .r_axis = ReadCommandRaxis(line),
-                .l_axis = ReadCommandLaxis(line),
-                .wait = ReadCommandWait(line),
+
+            std::stringstream linestream(line);
+            std::string segment;
+            std::vector<std::string> seglist;
+
+            while (std::getline(linestream, segment, ' ')) {
+                seglist.push_back(segment);
+            }
+
+            while (frameNo != std::stoi(seglist.at(0))) {
+                newCommands.push_back(empty);
+                frameNo++;
+            }
+
+            TASCommand command = {
+                .buttons = ReadCommandButtons(seglist.at(1)),
+                .l_axis = ReadCommandAxis(seglist.at(2)),
+                .r_axis = ReadCommandAxis(seglist.at(3)),
             };
-            commands.push_back(command);
+            newCommands.push_back(command);
+            frameNo++;
         }
-        LOG_ERROR(Input, "commands {}", commands.size());
     }
 
     void Tas::WriteTasFile() {
@@ -109,7 +119,7 @@ namespace TasInput {
     }
 
     void Tas::RecordInput(u32 buttons, std::array<std::pair<float, float>, 2> axes, bool changed) {
-        UpdateThread();
+        //UpdateThread();
         if (!Settings::values.tas_record) {
             return;
         }
@@ -127,124 +137,60 @@ namespace TasInput {
     }
 
     void Tas::UpdateThread() {
-        constexpr int update_time = 16;
         if (update_thread_running) {
-            /*if (refresh_tas_fle) {
-                LoadTasFile();
-                refresh_tas_fle = false;
+            if (!Settings::values.tas_record && !input_commands.empty()) {
+                WriteTasFile();
+                Settings::values.tas_reset = true;
+                refresh_tas_fle = true;
+                input_commands.clear();
+            }
+            if (Settings::values.tas_reset) {
                 current_command = 0;
-            }*/
-            //if (!Settings::values.tas_record) {
-                if (!Settings::values.tas_record && !input_commands.empty()) {
-                    WriteTasFile();
-                    Settings::values.tas_reset = true;
-                    refresh_tas_fle = true;
-                    input_commands.clear();
+                if (refresh_tas_fle) {
+                    LoadTasFile();
+                    refresh_tas_fle = false;
                 }
-                if (Settings::values.tas_reset) {
+                Settings::values.tas_reset = false;
+                LoadTasFile();
+                LOG_ERROR(Input, "reset");
+            }
+            if (Settings::values.tas_enable) {
+                if ((signed)current_command < newCommands.size()) {
+                    TASCommand command = newCommands[current_command++];
+                    LOG_ERROR(Input, "updateThread(): {}, buttons {}", current_command-1, command.buttons);
+                    tas_data[0].buttons = command.buttons;
+                    auto [l_axis_x, l_axis_y, l_axis_changed] = command.l_axis;
+                    tas_data[0].axis[0] = l_axis_x;
+                    tas_data[0].axis[1] = l_axis_y;
+                    auto [r_axis_x, r_axis_y, r_axis_changed] = command.r_axis;
+                    tas_data[0].axis[2] = r_axis_x;
+                    tas_data[0].axis[3] = r_axis_y;
+                } else {
+                    Settings::values.tas_enable = false;
                     current_command = 0;
-                    if (refresh_tas_fle) {
-                        LoadTasFile();
-                        refresh_tas_fle = false;
-                    }
-                    Settings::values.tas_reset = false;
-                    wait_for = 0;
-                    LOG_ERROR(Input, "reset");
-                }
-                if (Settings::values.tas_enable) {
-                    if (wait_for > 0) {
-                        wait_for--;
-                        // LOG_ERROR(Input, "Wait {}", wait_for);
-                    }
-                    else if (!commands.empty()) {
-                        if (current_command == 0) {
-                            tas_data[0].buttons = 0;
-                            tas_data[0].axis = {};
-                        }
-                        Command command = commands.at(current_command);
-                        tas_data[0].buttons &= ~command.release_buttons;
-                        tas_data[0].buttons |= command.press_buttons;
-                        auto [l_axis_x, l_axis_y, l_axis_changed] = command.l_axis;
-                        if (l_axis_changed) {
-                            tas_data[0].axis[0] = l_axis_x;
-                            tas_data[0].axis[1] = l_axis_y;
-                        }
-                        auto [r_axis_x, r_axis_y, r_axis_changed] = command.r_axis;
-                        if (r_axis_changed) {
-                            tas_data[0].axis[2] = r_axis_x;
-                            tas_data[0].axis[3] = r_axis_y;
-                        }
-                        LOG_ERROR(Input, "Command {} {}", current_command, commands.size());
-                        current_command = (current_command + 1) % commands.size();
-                        wait_for = command.wait;
-                    }
-                }
-                else {
                     tas_data[0].buttons = 0;
                     tas_data[0].axis = {};
                 }
-            //}
-            //std::this_thread::sleep_for(std::chrono::milliseconds(update_time));
+            } else {
+                tas_data[0].buttons = 0;
+                tas_data[0].axis = {};
+            }
         }
     }
 
-    u32 Tas::ReadCommandPress(const std::string line) const {
-        const std::regex press("press((?: [A-Z]+)+)");
-        std::smatch m;
-        std::regex_search(line, m, press);
-        if (m.length() != 0) {
-            LOG_DEBUG(Input, "press {}", ReadCommandButtons(m[1].str()));
-            return ReadCommandButtons(m[1].str());
-        }
-        return 0;
-    }
+    TasAnalog Tas::ReadCommandAxis(const std::string line) const {
+        std::stringstream linestream(line);
+        std::string segment;
+        std::vector<std::string> seglist;
+        LOG_DEBUG(Input, "axis {}", line);
 
-    u32 Tas::ReadCommandRelease(const std::string line) const {
-        const std::regex release("release((?: [A-Z]+)+)");
-        std::smatch m;
-        std::regex_search(line, m, release);
-        if (m.length() != 0) {
-            LOG_DEBUG(Input, "release {}", ReadCommandButtons(m[1].str()));
-            return ReadCommandButtons(m[1].str());
+        while (std::getline(linestream, segment, ';')) {
+            seglist.push_back(segment);
         }
-        return 0;
-    }
+        const float x = std::stof(seglist.at(0)) / 32767.f;
+        const float y = std::stof(seglist.at(1)) / 32767.f;
 
-    TasAnalog Tas::ReadCommandRaxis(const std::string line) const {
-        const std::regex raxis(R"re(raxis (-?[0-9]\.[0-9]+);(-?[0-9]\.[0-9]+))re");
-        std::smatch m;
-        std::regex_search(line, m, raxis);
-        if (m.length() != 0) {
-            LOG_DEBUG(Input, "raxis {}; {}", m[1].str(), m[2].str());
-            const float x = std::stof(m[1].str());
-            const float y = std::stof(m[2].str());
-            return { x, y, true };
-        }
-        return { 0.0f, 0.0f, false };
-    }
-
-    TasAnalog Tas::ReadCommandLaxis(const std::string line) const {
-        const std::regex laxis(R"re(laxis (-?[0-9]\.[0-9]+);(-?[0-9]\.[0-9]+))re");
-        std::smatch m;
-        std::regex_search(line, m, laxis);
-        if (m.length() != 0) {
-            LOG_DEBUG(Input, "raxis {}; {}", m[1].str(), m[2].str());
-            const float x = std::stof(m[1].str());
-            const float y = std::stof(m[2].str());
-            return { x, y, true };
-        }
-        return { 0.0f, 0.0f, false };
-    }
-
-    u32 Tas::ReadCommandWait(const std::string line) const {
-        std::regex wait(R"re(wait ([0-9]+))re");
-        std::smatch m;
-        std::regex_search(line, m, wait);
-        if (m.length() != 0) {
-            LOG_DEBUG(Input, "wait {}", m[1].str());
-            return std::stoi(m[1].str());
-        }
-        return 0;
+        return { x, y, true };
     }
 
     u32 Tas::ReadCommandButtons(const std::string data) const {
@@ -253,28 +199,28 @@ namespace TasInput {
         u32 buttons = 0;
         static const std::array<std::pair<std::string, TasButton>, 20>
             text_to_tas_button = {
-                std::pair{"A", TasButton::BUTTON_A},
-                {"B", TasButton::BUTTON_B},
-                {"X", TasButton::BUTTON_X},
-                {"Y", TasButton::BUTTON_Y},
-                {"LSTICK", TasButton::STICK_L},
-                {"RSTICK", TasButton::STICK_R},
-                {"L", TasButton::TRIGGER_L},
-                {"R", TasButton::TRIGGER_R},
-                {"PLUS", TasButton::BUTTON_PLUS},
-                {"MINUS", TasButton::BUTTON_MINUS},
-                {"LEFT", TasButton::BUTTON_LEFT},
-                {"UP", TasButton::BUTTON_UP},
-                {"RIGHT", TasButton::BUTTON_RIGHT},
-                {"DOWN", TasButton::BUTTON_DOWN},
-                {"SL", TasButton::BUTTON_SL},
-                {"SR", TasButton::BUTTON_SR},
-                {"CAPT", TasButton::BUTTON_CAPTURE},
-                {"HOME", TasButton::BUTTON_HOME},
-                {"ZL", TasButton::TRIGGER_ZL},
-                {"ZR", TasButton::TRIGGER_ZR},
+                std::pair{"KEY_A", TasButton::BUTTON_A},
+                {"KEY_B", TasButton::BUTTON_B},
+                {"KEY_X", TasButton::BUTTON_X},
+                {"KEY_Y", TasButton::BUTTON_Y},
+                {"KEY_LSTICK", TasButton::STICK_L},
+                {"KEY_RSTICK", TasButton::STICK_R},
+                {"KEY_L", TasButton::TRIGGER_L},
+                {"KEY_R", TasButton::TRIGGER_R},
+                {"KEY_PLUS", TasButton::BUTTON_PLUS},
+                {"KEY_MINUS", TasButton::BUTTON_MINUS},
+                {"KEY_DLEFT", TasButton::BUTTON_LEFT},
+                {"KEY_DUP", TasButton::BUTTON_UP},
+                {"KEY_DRIGHT", TasButton::BUTTON_RIGHT},
+                {"KEY_DDOWN", TasButton::BUTTON_DOWN},
+                {"KEY_SL", TasButton::BUTTON_SL},
+                {"KEY_SR", TasButton::BUTTON_SR},
+                {"KEY_CAPTURE", TasButton::BUTTON_CAPTURE},
+                {"KEY_HOME", TasButton::BUTTON_HOME},
+                {"KEY_ZL", TasButton::TRIGGER_ZL},
+                {"KEY_ZR", TasButton::TRIGGER_ZR},
         };
-        while (std::getline(button_text, line, ' ')) {
+        while (std::getline(button_text, line, ';')) {
             for (auto [text, tas_button] : text_to_tas_button) {
                 if (text == line) {
                     buttons |= static_cast<u32>(tas_button);
