@@ -86,5 +86,5 @@ void ControllerDialog::InputController(ControllerInput input) {
         buttons += (btn ? 1 : 0) << index;
         index++;
     }
-    input_subsystem->GetTas()->RecordInput(buttons, input.axis_values, input.changed);
+    input_subsystem->GetTas()->RecordInput(buttons, input.axis_values);
 }
