@@ -34,6 +34,7 @@ namespace TasInput {
             newCommands.clear();
         }
         std::string file = "";
+        Common::FS::ReadFileToString(true, Settings::values.tas_path, file);
         std::stringstream command_line(file);
         std::string line;
         int frameNo = 0;
@@ -78,11 +79,7 @@ namespace TasInput {
     }
 
     void Tas::RecordInput(u32 buttons, std::array<std::pair<float, float>, 2> axes) {
-        //UpdateThread();
-        if (!Settings::values.tas_record) {
-            return;
-        }
-        recordCommands.push_back({buttons, flipY(axes[0]), flipY(axes[1])});
+        lastInput = {buttons, flipY(axes[0]), flipY(axes[1])};
     }
 
     std::pair<float, float> Tas::flipY(std::pair<float, float> old) const {
@@ -92,6 +89,9 @@ namespace TasInput {
 
     void Tas::UpdateThread() {
         if (update_thread_running) {
+            if (Settings::values.tas_record) {
+                recordCommands.push_back(lastInput);
+            }
             if (!Settings::values.tas_record && !recordCommands.empty()) {
                 WriteTasFile();
                 Settings::values.tas_reset = true;
@@ -110,6 +110,7 @@ namespace TasInput {
             }
             if (Settings::values.tas_enable) {
                 if ((signed)current_command < newCommands.size()) {
+                    LOG_ERROR(Input, "Playing TAS {}/{}", current_command, newCommands.size());
                     TASCommand command = newCommands[current_command++];
                     tas_data[0].buttons = command.buttons;
                     auto [l_axis_x, l_axis_y] = command.l_axis;

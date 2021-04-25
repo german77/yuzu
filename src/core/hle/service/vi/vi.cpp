@@ -32,6 +32,8 @@
 #include "core/hle/service/vi/vi_s.h"
 #include "core/hle/service/vi/vi_u.h"
 
+#include <input_common/tas/tas_input.h>
+
 namespace Service::VI {
 
 constexpr ResultCode ERR_OPERATION_FAILED{ErrorModule::VI, 1};
