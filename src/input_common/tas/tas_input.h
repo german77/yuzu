@@ -86,5 +86,6 @@ private:
     std::vector<TASCommand> newCommands{};
     std::vector<TASCommand> recordCommands{};
     std::size_t current_command{0};
+    TASCommand lastInput{};
 };
 } // namespace TasInput
