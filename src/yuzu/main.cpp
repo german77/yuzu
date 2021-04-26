@@ -30,6 +30,8 @@
 #include "core/hle/service/am/applet_oe.h"
 #include "core/hle/service/am/applets/applets.h"
 
+#include "input_common/tas/tas_input.h"
+
 // These are wrappers to avoid the calls to CreateDirectory and CreateFile because of the Windows
 // defines.
 static FileSys::VirtualDir VfsFilesystemCreateDirectoryWrapper(
@@ -214,6 +216,7 @@ GMainWindow::GMainWindow()
     : input_subsystem{std::make_shared<InputCommon::InputSubsystem>()},
       config{std::make_unique<Config>()}, vfs{std::make_shared<FileSys::RealVfsFilesystem>()},
       provider{std::make_unique<FileSys::ManualContentProvider>()} {
+    Settings::values.inputSubsystem = input_subsystem;
     InitializeLogging();
 
     LoadTranslation();
@@ -842,6 +845,12 @@ void GMainWindow::InitializeWidgets() {
     });
     statusBar()->insertPermanentWidget(0, renderer_status_button);
 
+    TASlabel = new QLabel();
+    TASlabel->setObjectName(QStringLiteral("TASlabel"));
+    TASlabel->setText(tr("TAS not running"));
+    TASlabel->setFocusPolicy(Qt::NoFocus);
+    statusBar()->insertPermanentWidget(0,TASlabel);
+
     statusBar()->setVisible(true);
     setStyleSheet(QStringLiteral("QStatusBar::item{border: none;}"));
 }
@@ -860,7 +869,7 @@ void GMainWindow::InitializeDebugWidgets() {
     waitTreeWidget->hide();
     debug_menu->addAction(waitTreeWidget->toggleViewAction());
 
-    controller_dialog = new ControllerDialog(this);
+    controller_dialog = new ControllerDialog(this, input_subsystem.get());
     controller_dialog->hide();
     debug_menu->addAction(controller_dialog->toggleViewAction());
 
@@ -1028,6 +1037,19 @@ void GMainWindow::InitializeHotkeys() {
                     render_window->installEventFilter(render_window);
                     render_window->setAttribute(Qt::WA_Hover, true);
                 }
+            });
+    connect(hotkey_registry.GetHotkey(main_window, QStringLiteral("TAS Start/Stop"), this),
+            &QShortcut::activated, this, [&] {
+                Settings::values.tas_enable = !Settings::values.tas_enable;
+                LOG_INFO(Frontend, "Tas enabled {}", Settings::values.tas_enable);
+            });
+
+    connect(hotkey_registry.GetHotkey(main_window, QStringLiteral("TAS Reset"), this),
+            &QShortcut::activated, this, [&] { Settings::values.tas_reset = true; });
+    connect(hotkey_registry.GetHotkey(main_window, QStringLiteral("TAS Record"), this),
+            &QShortcut::activated, this, [&] {
+                Settings::values.tas_record = !Settings::values.tas_record;
+                LOG_INFO(Frontend, "Tas recording {}", Settings::values.tas_record);
             });
 }
 
@@ -2775,6 +2797,8 @@ void GMainWindow::UpdateStatusBar() {
         status_bar_update_timer.stop();
         return;
     }
+
+    TASlabel->setText(tr(Settings::values.inputSubsystem->GetTas()->GetStatusDescription().c_str()));
 
     auto results = Core::System::GetInstance().GetAndResetPerfStats();
     auto& shader_notify = Core::System::GetInstance().GPU().ShaderNotify();

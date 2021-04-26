@@ -14,6 +14,7 @@
 
 #include "common/common_types.h"
 #include "common/settings_input.h"
+#include <input_common/main.h>
 
 namespace Settings {
 
@@ -169,6 +170,7 @@ struct Values {
 
     // Controls
     InputSetting<std::array<PlayerInput, 10>> players;
+    std::shared_ptr<InputCommon::InputSubsystem> inputSubsystem = NULL;
 
     Setting<bool> use_docked_mode;
 
@@ -178,6 +180,10 @@ struct Values {
     Setting<bool> motion_enabled;
     std::string motion_device;
     std::string udp_input_servers;
+
+    bool tas_enable;
+    bool tas_reset;
+    bool tas_record;
 
     bool mouse_panning;
     float mouse_panning_sensitivity;
@@ -208,6 +214,7 @@ struct Values {
     bool gamecard_inserted;
     bool gamecard_current_game;
     std::string gamecard_path;
+    std::string tas_path;
 
     // Debugging
     bool record_frame_times;

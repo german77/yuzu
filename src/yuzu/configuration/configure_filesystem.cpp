@@ -26,6 +26,8 @@ ConfigureFilesystem::ConfigureFilesystem(QWidget* parent)
             [this] { SetDirectory(DirectoryTarget::Dump, ui->dump_path_edit); });
     connect(ui->load_path_button, &QToolButton::pressed, this,
             [this] { SetDirectory(DirectoryTarget::Load, ui->load_path_edit); });
+    connect(ui->tas_path_button, &QToolButton::pressed, this,
+            [this] { SetDirectory(DirectoryTarget::TAS, ui->tas_path_edit); });
 
     connect(ui->reset_game_list_cache, &QPushButton::pressed, this,
             &ConfigureFilesystem::ResetMetadata);
@@ -48,6 +50,7 @@ void ConfigureFilesystem::setConfiguration() {
         QString::fromStdString(Common::FS::GetUserPath(Common::FS::UserPath::DumpDir)));
     ui->load_path_edit->setText(
         QString::fromStdString(Common::FS::GetUserPath(Common::FS::UserPath::LoadDir)));
+    ui->tas_path_edit->setText(QString::fromStdString(Settings::values.tas_path));
 
     ui->gamecard_inserted->setChecked(Settings::values.gamecard_inserted);
     ui->gamecard_current_game->setChecked(Settings::values.gamecard_current_game);
@@ -69,6 +72,7 @@ void ConfigureFilesystem::applyConfiguration() {
     Common::FS::GetUserPath(Common::FS::UserPath::LoadDir,
                             ui->load_path_edit->text().toStdString());
 
+    Settings::values.tas_path = ui->tas_path_edit->text().toStdString();
     Settings::values.gamecard_inserted = ui->gamecard_inserted->isChecked();
     Settings::values.gamecard_current_game = ui->gamecard_current_game->isChecked();
     Settings::values.dump_exefs = ui->dump_exefs->isChecked();
@@ -96,12 +100,18 @@ void ConfigureFilesystem::SetDirectory(DirectoryTarget target, QLineEdit* edit) 
     case DirectoryTarget::Load:
         caption = tr("Select Mod Load Directory...");
         break;
+    case DirectoryTarget::TAS:
+        caption = tr("Select TAS File...");
+        break;
     }
 
     QString str;
     if (target == DirectoryTarget::Gamecard) {
         str = QFileDialog::getOpenFileName(this, caption, QFileInfo(edit->text()).dir().path(),
                                            QStringLiteral("NX Gamecard;*.xci"));
+    } else if (target == DirectoryTarget::TAS) {
+        str = QFileDialog::getOpenFileName(this, caption, QFileInfo(edit->text()).dir().path(),
+                                           QStringLiteral("Text File;*.txt"));
     } else {
         str = QFileDialog::getExistingDirectory(this, caption, edit->text());
         if (!str.isNull() && str.back() != QDir::separator()) {

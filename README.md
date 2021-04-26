@@ -4,6 +4,8 @@ yuzu emulator
 [![Azure Mainline CI Build Status](https://dev.azure.com/yuzu-emu/yuzu/_apis/build/status/yuzu%20mainline?branchName=master)](https://dev.azure.com/yuzu-emu/yuzu/)
 [![Discord](https://img.shields.io/discord/398318088170242053?color=%237289DA&label=yuzu&logo=discord&logoColor=white)](https://discord.com/invite/u77vRWY)
 
+Special thanks in this version goes to [Naii the Baf](https://github.com/Naii-the-Baf/yuzu/tree/naii-tas) for creating and providing the first TASing version of Yuzu, and averne for pointing out the perfect location for syncing the inputs!
+
 yuzu is an experimental open-source emulator for the Nintendo Switch from the creators of [Citra](https://citra-emu.org/).
 
 It is written in C++ with portability in mind, with builds actively maintained for Windows and Linux. The emulator is capable of running several commercial games.
