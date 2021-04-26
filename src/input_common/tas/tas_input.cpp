@@ -151,29 +151,6 @@ namespace TasInput {
         std::stringstream button_text(data);
         std::string line;
         u32 buttons = 0;
-        static const std::array<std::pair<std::string, TasButton>, 20>
-            text_to_tas_button = {
-                std::pair{"KEY_A", TasButton::BUTTON_A},
-                {"KEY_B", TasButton::BUTTON_B},
-                {"KEY_X", TasButton::BUTTON_X},
-                {"KEY_Y", TasButton::BUTTON_Y},
-                {"KEY_LSTICK", TasButton::STICK_L},
-                {"KEY_RSTICK", TasButton::STICK_R},
-                {"KEY_L", TasButton::TRIGGER_L},
-                {"KEY_R", TasButton::TRIGGER_R},
-                {"KEY_PLUS", TasButton::BUTTON_PLUS},
-                {"KEY_MINUS", TasButton::BUTTON_MINUS},
-                {"KEY_DLEFT", TasButton::BUTTON_LEFT},
-                {"KEY_DUP", TasButton::BUTTON_UP},
-                {"KEY_DRIGHT", TasButton::BUTTON_RIGHT},
-                {"KEY_DDOWN", TasButton::BUTTON_DOWN},
-                {"KEY_SL", TasButton::BUTTON_SL},
-                {"KEY_SR", TasButton::BUTTON_SR},
-                {"KEY_CAPTURE", TasButton::BUTTON_CAPTURE},
-                {"KEY_HOME", TasButton::BUTTON_HOME},
-                {"KEY_ZL", TasButton::TRIGGER_ZL},
-                {"KEY_ZR", TasButton::TRIGGER_ZR},
-        };
         while (std::getline(button_text, line, ';')) {
             for (auto [text, tas_button] : text_to_tas_button) {
                 if (text == line) {
@@ -199,22 +176,10 @@ namespace TasInput {
             return "NONE";
 
         std::string line;
-        static const std::array<std::pair<std::string, TasButton>, 20> tas_to_text_button = {
-            std::pair{"KEY_A", TasButton::BUTTON_A}, {"KEY_B", TasButton::BUTTON_B},
-            {"KEY_X", TasButton::BUTTON_X},          {"KEY_Y", TasButton::BUTTON_Y},
-            {"KEY_LSTICK", TasButton::STICK_L},      {"KEY_RSTICK", TasButton::STICK_R},
-            {"KEY_L", TasButton::TRIGGER_L},         {"KEY_R", TasButton::TRIGGER_R},
-            {"KEY_PLUS", TasButton::BUTTON_PLUS},    {"KEY_MINUS", TasButton::BUTTON_MINUS},
-            {"KEY_LEFT", TasButton::BUTTON_LEFT},    {"KEY_DUP", TasButton::BUTTON_UP},
-            {"KEY_RIGHT", TasButton::BUTTON_RIGHT},  {"KEY_DDOWN", TasButton::BUTTON_DOWN},
-            {"KEY_SL", TasButton::BUTTON_SL},        {"KEY_SR", TasButton::BUTTON_SR},
-            {"KEY_CAPTURE", TasButton::BUTTON_CAPTURE}, {"KEY_HOME", TasButton::BUTTON_HOME},
-            {"KEY_ZL", TasButton::TRIGGER_ZL},       {"KEY_ZR", TasButton::TRIGGER_ZR},
-        };
         u32 index = 0;
         while (data > 0) {
             if ((data & 1) == 1) {
-                for (auto [text, tas_button] : tas_to_text_button) {
+                for (auto [text, tas_button] : text_to_tas_button) {
                     if (tas_button == static_cast<TasButton>(1 << index)) {
                         if (line.size() > 0)
                             line += ";";

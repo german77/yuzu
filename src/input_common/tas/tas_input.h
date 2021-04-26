@@ -39,6 +39,29 @@ enum class TasButton {
     BUTTON_CAPTURE = 0x080000,
 };
 
+static const std::array<std::pair<std::string, TasButton>, 20> text_to_tas_button = {
+    std::pair{"KEY_A", TasButton::BUTTON_A},
+    {"KEY_B", TasButton::BUTTON_B},
+    {"KEY_X", TasButton::BUTTON_X},
+    {"KEY_Y", TasButton::BUTTON_Y},
+    {"KEY_LSTICK", TasButton::STICK_L},
+    {"KEY_RSTICK", TasButton::STICK_R},
+    {"KEY_L", TasButton::TRIGGER_L},
+    {"KEY_R", TasButton::TRIGGER_R},
+    {"KEY_PLUS", TasButton::BUTTON_PLUS},
+    {"KEY_MINUS", TasButton::BUTTON_MINUS},
+    {"KEY_DLEFT", TasButton::BUTTON_LEFT},
+    {"KEY_DUP", TasButton::BUTTON_UP},
+    {"KEY_DRIGHT", TasButton::BUTTON_RIGHT},
+    {"KEY_DDOWN", TasButton::BUTTON_DOWN},
+    {"KEY_SL", TasButton::BUTTON_SL},
+    {"KEY_SR", TasButton::BUTTON_SR},
+    {"KEY_CAPTURE", TasButton::BUTTON_CAPTURE},
+    {"KEY_HOME", TasButton::BUTTON_HOME},
+    {"KEY_ZL", TasButton::TRIGGER_ZL},
+    {"KEY_ZR", TasButton::TRIGGER_ZR},
+};
+
 enum class TasAxes : u8 {
     StickX,
     StickY,
