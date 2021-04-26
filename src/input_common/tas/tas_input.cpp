@@ -30,6 +30,7 @@ namespace TasInput {
         refresh_tas_fle = true;
     }
     void Tas::LoadTasFile() {
+        LOG_DEBUG(Input, "LoadTasFile()");
         if (!newCommands.empty()) {
             newCommands.clear();
         }
@@ -65,9 +66,11 @@ namespace TasInput {
             newCommands.push_back(command);
             frameNo++;
         }
+        LOG_INFO(Input, "TAS file loaded!");
     }
 
     void Tas::WriteTasFile() {
+        LOG_DEBUG(Input, "WriteTasFile()");
         std::string output_text = "";
         for (int frame = 0; frame < (signed)recordCommands.size(); frame++) {
             if (!output_text.empty())
@@ -76,6 +79,7 @@ namespace TasInput {
             output_text += std::to_string(frame) + " " + WriteCommandButtons(line.buttons) + " " + WriteCommandAxis(line.l_axis) + " " + WriteCommandAxis(line.r_axis);
         }
         Common::FS::WriteStringToFile(true, Settings::values.tas_path, output_text);
+        LOG_INFO("TAS file written to file!");
     }
 
     void Tas::RecordInput(u32 buttons, std::array<std::pair<float, float>, 2> axes) {
@@ -116,11 +120,11 @@ namespace TasInput {
                 }
                 Settings::values.tas_reset = false;
                 LoadTasFile();
-                LOG_ERROR(Input, "reset");
+                LOG_DEBUG(Input, "tas_reset done");
             }
             if (Settings::values.tas_enable) {
                 if ((signed)current_command < newCommands.size()) {
-                    LOG_ERROR(Input, "Playing TAS {}/{}", current_command, newCommands.size());
+                    LOG_INFO(Input, "Playing TAS {}/{}", current_command, newCommands.size());
                     TASCommand command = newCommands[current_command++];
                     tas_data[0].buttons = command.buttons;
                     auto [l_axis_x, l_axis_y] = command.l_axis;
@@ -146,7 +150,6 @@ namespace TasInput {
         std::stringstream linestream(line);
         std::string segment;
         std::vector<std::string> seglist;
-        LOG_DEBUG(Input, "axis {}", line);
 
         while (std::getline(linestream, segment, ';')) {
             seglist.push_back(segment);
