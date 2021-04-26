@@ -53,6 +53,9 @@ namespace TasInput {
                 seglist.push_back(segment);
             }
 
+            if (seglist.size() < 4)
+                continue;
+
             while (frameNo < std::stoi(seglist.at(0))) {
                 newCommands.push_back(empty);
                 frameNo++;
