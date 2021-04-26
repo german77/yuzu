@@ -79,7 +79,7 @@ namespace TasInput {
             output_text += std::to_string(frame) + " " + WriteCommandButtons(line.buttons) + " " + WriteCommandAxis(line.l_axis) + " " + WriteCommandAxis(line.r_axis);
         }
         Common::FS::WriteStringToFile(true, Settings::values.tas_path, output_text);
-        LOG_INFO("TAS file written to file!");
+        LOG_INFO(Input, "TAS file written to file!");
     }
 
     void Tas::RecordInput(u32 buttons, std::array<std::pair<float, float>, 2> axes) {
