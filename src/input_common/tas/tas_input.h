@@ -84,6 +84,7 @@ public:
     void LoadTasFile();
     void RecordInput(u32 buttons, std::array<std::pair<float, float>, 2> axes);
     void UpdateThread();
+    std::string GetStatusDescription();
 
     InputCommon::ButtonMapping GetButtonMappingForDevice(const Common::ParamPackage& params) const;
     InputCommon::AnalogMapping GetAnalogMappingForDevice(const Common::ParamPackage& params) const;

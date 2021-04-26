@@ -87,6 +87,16 @@ namespace TasInput {
         return {x, -y};
     }
 
+    std::string Tas::GetStatusDescription() {
+        if (Settings::values.tas_record) {
+            return "Recording TAS: " + std::to_string(recordCommands.size());
+        }
+        if (Settings::values.tas_enable) {
+            return "Playing TAS: " + std::to_string(current_command) + "/" + std::to_string(newCommands.size());
+        }
+        return "TAS not running: " + std::to_string(current_command) + "/" + std::to_string(newCommands.size());
+    }
+
     void Tas::UpdateThread() {
         if (update_thread_running) {
             if (Settings::values.tas_record) {
