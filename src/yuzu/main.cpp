@@ -30,6 +30,8 @@
 #include "core/hle/service/am/applet_oe.h"
 #include "core/hle/service/am/applets/applets.h"
 
+#include "input_common/tas/tas_input.h"
+
 // These are wrappers to avoid the calls to CreateDirectory and CreateFile because of the Windows
 // defines.
 static FileSys::VirtualDir VfsFilesystemCreateDirectoryWrapper(
@@ -844,6 +846,12 @@ void GMainWindow::InitializeWidgets() {
         Core::System::GetInstance().ApplySettings();
     });
     statusBar()->insertPermanentWidget(0, renderer_status_button);
+
+    TASlabel = new QLabel();
+    TASlabel->setObjectName(QStringLiteral("TASlabel"));
+    TASlabel->setText(tr("TAS not running"));
+    TASlabel->setFocusPolicy(Qt::NoFocus);
+    statusBar()->insertPermanentWidget(0,TASlabel);
 
     statusBar()->setVisible(true);
     setStyleSheet(QStringLiteral("QStatusBar::item{border: none;}"));
@@ -2791,6 +2799,8 @@ void GMainWindow::UpdateStatusBar() {
         status_bar_update_timer.stop();
         return;
     }
+
+    TASlabel->setText(tr(Settings::values.inputSubsystem->GetTas()->GetStatusDescription().c_str()));
 
     auto results = Core::System::GetInstance().GetAndResetPerfStats();
     auto& shader_notify = Core::System::GetInstance().GPU().ShaderNotify();
