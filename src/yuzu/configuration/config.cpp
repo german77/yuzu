@@ -625,6 +625,8 @@ void Config::ReadDataStorageValues() {
         ReadSetting(QStringLiteral("gamecard_inserted"), false).toBool();
     Settings::values.gamecard_current_game =
         ReadSetting(QStringLiteral("gamecard_current_game"), false).toBool();
+    Settings::values.pauseTasOnLoad =
+        ReadSetting(QStringLiteral("tas_pause_on_load"), true).toBool();
     Settings::values.gamecard_path =
         ReadSetting(QStringLiteral("gamecard_path"), QString{}).toString().toStdString();
     Settings::values.tas_path =
@@ -1237,6 +1239,7 @@ void Config::SaveDataStorageValues() {
                  QString::fromStdString(FS::GetUserPath(FS::UserPath::DumpDir)),
                  QString::fromStdString(FS::GetUserPath(FS::UserPath::DumpDir)));
     WriteSetting(QStringLiteral("gamecard_inserted"), Settings::values.gamecard_inserted, false);
+    WriteSetting(QStringLiteral("tas_pause_on_load"), Settings::values.pauseTasOnLoad, true);
     WriteSetting(QStringLiteral("gamecard_current_game"), Settings::values.gamecard_current_game,
                  false);
     WriteSetting(QStringLiteral("gamecard_path"),

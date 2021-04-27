@@ -106,6 +106,11 @@ namespace TasInput {
 
     void Tas::UpdateThread() {
         if (update_thread_running) {
+            if (Settings::values.pauseTasOnLoad && Settings::values.cpuBoosted) {
+                tas_data[0].buttons = 0;
+                tas_data[0].axis = {};
+            }
+
             if (Settings::values.tas_record) {
                 recordCommands.push_back(lastInput);
             }
