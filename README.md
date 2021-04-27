@@ -36,7 +36,7 @@ First, set up the location/environment using your desired method of input (to be
 
 For debugging the script, you can enable `View` -> `Debugging` -> `Controller P1` to have an input display of Player 1. This helps in finding timing issues.
 
-Now, before starting the playback, you may want to refresh the file and reset playback progress if you already played a TAS before. Just getting used to always reset before playbeck will avoid the issue of playing back an older version of the file, if you changed the script while Yuzu was still running.
+Now, before starting the playback, you may want to refresh the file and reset playback progress if you already played a TAS before. Just getting used to always reset before playback will avoid the issue of playing back an older version of the file, if you changed the script while Yuzu was still running.
 
 Press `CTRL + F6` to refresh the file, then `CTRL + F5` to start the playback.
 
