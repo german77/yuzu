@@ -184,6 +184,7 @@ struct Values {
     bool tas_enable;
     bool tas_reset;
     bool tas_record;
+    bool cpuBoosted;
 
     bool mouse_panning;
     float mouse_panning_sensitivity;
@@ -215,6 +216,7 @@ struct Values {
     bool gamecard_current_game;
     std::string gamecard_path;
     std::string tas_path;
+    bool pauseTasOnLoad;
 
     // Debugging
     bool record_frame_times;

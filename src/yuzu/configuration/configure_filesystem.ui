@@ -258,6 +258,13 @@
                 </property>
               </spacer>
             </item>
+            <item row="1" column="0" colspan="4">
+              <widget class="QCheckBox" name="tas_pause_on_load">
+                <property name="text">
+                  <string>Pause TAS execution during loads (SMO - 1.3)</string>
+                </property>
+              </widget>
+            </item>
           </layout>
         </widget>
       </item>
