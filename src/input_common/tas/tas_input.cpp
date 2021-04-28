@@ -15,6 +15,10 @@
 #include "common/logging/log.h"
 #include "input_common/tas/tas_input.h"
 #include "common/file_util.h"
+#include <core/core.h>
+#include <core/frontend/framebuffer_layout.h>
+#include <QImage>
+#include "video_core/renderer_base.h"
 
 namespace TasInput {
 
@@ -35,7 +39,7 @@ namespace TasInput {
             newCommands.clear();
         }
         std::string file = "";
-        Common::FS::ReadFileToString(true, Settings::values.tas_path, file);
+        Common::FS::ReadFileToString(false, Settings::values.tas_path, file);
         std::stringstream command_line(file);
         std::string line;
         int frameNo = 0;
@@ -43,6 +47,7 @@ namespace TasInput {
         while (std::getline(command_line, line, '\n')) {
             if (line.empty())
                 continue;
+            LOG_DEBUG(Input, "Loading line: {}", line);
             std::smatch m;
 
             std::stringstream linestream(line);
@@ -162,6 +167,7 @@ namespace TasInput {
         while (std::getline(linestream, segment, ';')) {
             seglist.push_back(segment);
         }
+
         const float x = std::stof(seglist.at(0)) / 32767.f;
         const float y = std::stof(seglist.at(1)) / 32767.f;
 
