@@ -398,6 +398,8 @@ add_library(core STATIC
     hle/service/grc/grc.h
     hle/service/hid/hid.cpp
     hle/service/hid/hid.h
+    hle/service/hid/hidbus.cpp
+    hle/service/hid/hidbus.h
     hle/service/hid/irs.cpp
     hle/service/hid/irs.h
     hle/service/hid/xcd.cpp

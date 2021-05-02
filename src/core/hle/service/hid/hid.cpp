@@ -21,6 +21,7 @@
 #include "core/hle/kernel/kernel.h"
 #include "core/hle/service/hid/errors.h"
 #include "core/hle/service/hid/hid.h"
+#include "core/hle/service/hid/hidbus.h"
 #include "core/hle/service/hid/irs.h"
 #include "core/hle/service/hid/xcd.h"
 #include "core/hle/service/service.h"
@@ -1030,7 +1031,7 @@ void Hid::SwapNpadAssignment(Kernel::HLERequestContext& ctx) {
     const bool res = applet_resource->GetController<Controller_NPad>(HidController::NPad)
                          .SwapNpadAssignment(npad_id_1, npad_id_2);
 
-    LOG_DEBUG(Service_HID, "called, npad_id_1={}, npad_id_2={}, applet_resource_user_id={}",
+    LOG_ERROR(Service_HID, "called, npad_id_1={}, npad_id_2={}, applet_resource_user_id={}",
               npad_id_1, npad_id_2, applet_resource_user_id);
 
     IPC::ResponseBuilder rb{ctx, 2};
@@ -1964,31 +1965,6 @@ public:
     }
 };
 
-class HidBus final : public ServiceFramework<HidBus> {
-public:
-    explicit HidBus(Core::System& system_) : ServiceFramework{system_, "hidbus"} {
-        // clang-format off
-        static const FunctionInfo functions[] = {
-            {1, nullptr, "GetBusHandle"},
-            {2, nullptr, "IsExternalDeviceConnected"},
-            {3, nullptr, "Initialize"},
-            {4, nullptr, "Finalize"},
-            {5, nullptr, "EnableExternalDevice"},
-            {6, nullptr, "GetExternalDeviceId"},
-            {7, nullptr, "SendCommandAsync"},
-            {8, nullptr, "GetSendCommandAsynceResult"},
-            {9, nullptr, "SetEventForSendCommandAsycResult"},
-            {10, nullptr, "GetSharedMemoryHandle"},
-            {11, nullptr, "EnableJoyPollingReceiveMode"},
-            {12, nullptr, "DisableJoyPollingReceiveMode"},
-            {13, nullptr, "GetPollingData"},
-            {14, nullptr, "SetStatusManagerType"},
-        };
-        // clang-format on
-
-        RegisterHandlers(functions);
-    }
-};
 
 void ReloadInputDevices() {
     Settings::values.is_device_reload_pending.store(true);
