@@ -5,15 +5,18 @@
 #pragma once
 #include "core/hle/service/service.h"
 
+namespace Core::Timing {
+struct EventType;
+}
+
 namespace Core {
 class System;
 }
 
 namespace Kernel {
-class KSharedMemory;
 class KEvent;
 class KReadableEvent;
-}
+} // namespace Kernel
 
 namespace Service::HID {
 
@@ -30,39 +33,111 @@ public:
         MaxBusType,
     };
 
-    struct BusHandle {
+    enum class JoyPollingMode : u32 {
+        SixAxisSensorDisable,
+        SixAxisSensorEnable,
+        ButtonOnly,
+    };
+
+    struct HidbusBusHandle {
         u32_le abstracted_pad_id;
         u8 internal_index;
         u8 player_number;
         BusType bus_type;
         bool is_valid;
     };
-    static_assert(sizeof(BusHandle) == 0x8, "BusHandle is an invalid size");
+    static_assert(sizeof(HidbusBusHandle) == 0x8, "HidbusBusHandle is an invalid size");
 
-    enum class JoyPollingMode : u32 {
-        GetJoyDisableSixAxisPollingDataAccessor,
-        GetJoyEnableSixAxisPollingDataAccessor,
-        GetJoyButtonOnlyPollingDataAccessor,
+    struct JoyPollingReceivedData {
+        std::array<u8, 0x30> data;
+        u64 out_size;
+        u64 sampling_number;
     };
+    static_assert(sizeof(JoyPollingReceivedData) == 0x40,
+                  "JoyPollingReceivedData is an invalid size");
 
-    struct HidBusEntry {
-        u8 flag;
-        u8 padding_byte1;
-        u8 padding_byte2;
-        u8 padding_byte3;
-        u32 resutl;
-        u8 deviceEnabled;
-        u8 isValid;
-        u8 pollingEnabled;
-        u8 unknow_padding;
-        JoyPollingMode polling_mode;
-        INSERT_PADDING_BYTES(0x70);
+    struct DataAccessorHeader {
+        ResultCode result;
+        INSERT_PADDING_WORDS(0x1);
+        std::array<u8, 0x18> unused;
+        u64 latest_entry;
+        u64 total_entries;
     };
-    static_assert(sizeof(HidBusEntry) == 0x80, "HidBusEntry is an invalid size");
+    static_assert(sizeof(DataAccessorHeader) == 0x30, "DataAccessorHeader is an invalid size");
+
+    struct JoyDisableSixAxisPollingData {
+        std::array<u8, 0x26> data;
+        u8 out_size;
+        INSERT_PADDING_BYTES(0x1);
+        u64 sampling_number;
+    };
+    static_assert(sizeof(JoyDisableSixAxisPollingData) == 0x30,
+                  "JoyDisableSixAxisPollingData is an invalid size");
+
+    struct JoyDisableSixAxisPollingEntry {
+        u64 sampling_number;
+        JoyDisableSixAxisPollingData data;
+    };
+    static_assert(sizeof(JoyDisableSixAxisPollingEntry) == 0x38,
+                  "JoyDisableSixAxisPollingEntry is an invalid size");
+
+    struct JoyEnableSixAxisPollingData {
+        std::array<u8, 0x8> data;
+        u8 out_size;
+        INSERT_PADDING_BYTES(0x7);
+        u64 sampling_number;
+    };
+    static_assert(sizeof(JoyEnableSixAxisPollingData) == 0x18,
+                  "JoyEnableSixAxisPollingData is an invalid size");
+
+    struct JoyEnableSixAxisPollingEntry {
+        u64 sampling_number;
+        JoyEnableSixAxisPollingData data;
+    };
+    static_assert(sizeof(JoyEnableSixAxisPollingEntry) == 0x20,
+                  "JoyEnableSixAxisPollingEntry is an invalid size");
+
+    struct JoyButtonOnlyPollingData {
+        std::array<u8, 0x2c> data;
+        u8 out_size;
+        INSERT_PADDING_BYTES(0x3);
+        u64 sampling_number;
+    };
+    static_assert(sizeof(JoyButtonOnlyPollingData) == 0x38,
+                  "JoyButtonOnlyPollingData is an invalid size");
+
+    struct JoyButtonOnlyPollingEntry {
+        u64 sampling_number;
+        JoyButtonOnlyPollingData data;
+    };
+    static_assert(sizeof(JoyButtonOnlyPollingEntry) == 0x40,
+                  "JoyButtonOnlyPollingEntry is an invalid size");
+
+    struct HidbusStatusManagerEntry {
+        u8 is_connected{};
+        INSERT_PADDING_BYTES(0x3);
+        ResultCode is_connected_result{0};
+        u8 is_enabled{};
+        u8 is_in_focus{};
+        u8 is_polling_mode{};
+        u8 reserved{};
+        JoyPollingMode polling_mode{};
+        std::array<u8, 0x70> data{};
+    };
+    static_assert(sizeof(HidbusStatusManagerEntry) == 0x80,
+                  "HidbusStatusManagerEntry is an invalid size");
+
+    struct HidbusStatusManager {
+        std::array<HidbusStatusManagerEntry, 19> entries{};
+    };
+    static_assert(sizeof(HidbusStatusManager) == 0x980,
+                  "JoyButtonOnlyPollingEntry is an invalid size");
 
 private:
     void GetBusHandle(Kernel::HLERequestContext& ctx);
     void IsExternalDeviceConnected(Kernel::HLERequestContext& ctx);
+    void Initialize(Kernel::HLERequestContext& ctx);
+    void EnableExternalDevice(Kernel::HLERequestContext& ctx);
     void GetExternalDeviceId(Kernel::HLERequestContext& ctx);
     void SendCommandAsync(Kernel::HLERequestContext& ctx);
     void GetSendCommandAsynceResult(Kernel::HLERequestContext& ctx);
@@ -70,10 +145,18 @@ private:
     void GetSharedMemoryHandle(Kernel::HLERequestContext& ctx);
     void GetPollingData(Kernel::HLERequestContext& ctx);
     void SetStatusManagerType(Kernel::HLERequestContext& ctx);
-    //std::shared_ptr<Kernel::Handle>& GetReadableEvent();
-    std::shared_ptr<Kernel::KEvent> send_command_asyc_event;
-    std::shared_ptr<Kernel::Handle> bus_handle{};
-    std::shared_ptr<Kernel::KSharedMemory> shared_memory;
+
+    void UpdateHidbus(std::uintptr_t user_data, std::chrono::nanoseconds ns_late);
+    void UpdateSharedMemory(const Core::Timing::CoreTiming& core_timing);
+    // std::shared_ptr<Kernel::Handle>& GetReadableEvent();
+    Kernel::KEvent* send_command_asyc_event;
+    bool is_hidbus_enabled{false};
+    bool send_command_asyc{false};
+    HidbusBusHandle bus_handle{};
+    HidbusStatusManager hidbus_status{};
+    int last_entry_index = 0;
+    int entry_count = 0;
+    std::shared_ptr<Core::Timing::EventType> hidbus_update_event;
 };
 
 } // namespace Service::HID
