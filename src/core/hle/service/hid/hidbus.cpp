@@ -14,6 +14,7 @@
 #include "core/hle/kernel/kernel.h"
 #include "core/hle/kernel/k_transfer_memory.h"
 #include "core/hle/service/hid/errors.h"
+#include "core/hle/service/hid/hidbus/ringcon.h"
 #include "core/hle/service/hid/hidbus.h"
 #include "core/hle/service/service.h"
 
@@ -66,13 +67,13 @@ HidBus::~HidBus() {
 void HidBus::UpdateHidbus(std::uintptr_t user_data, std::chrono::nanoseconds ns_late) {
     auto& core_timing = system.CoreTiming();
 
-    UpdateSharedMemory(core_timing);
+    //ringcon.OnUpdate(core_timing, &hidbus_status,0x900);
 
     // We can send the answer right away no need to wait
-    if (send_command_asyc) {
-        send_command_asyc_event->GetWritableEvent().Signal();
-        send_command_asyc = false;
-    }
+    //if (send_command_asyc) {
+    //    send_command_asyc_event->GetWritableEvent().Signal();
+    //    send_command_asyc = false;
+    //}
 
     // If ns_late is higher than the update rate ignore the delay
     if (ns_late > hidbus_update_ns) {
@@ -82,47 +83,6 @@ void HidBus::UpdateHidbus(std::uintptr_t user_data, std::chrono::nanoseconds ns_
     core_timing.ScheduleEvent(hidbus_update_ns - ns_late, hidbus_update_event);
 }
 
-void HidBus::UpdateSharedMemory(const Core::Timing::CoreTiming& core_timing) {
-    if (!is_hidbus_enabled) {
-        return;
-    }
-
-    const auto& last_entry = hidbus_status.entries[last_entry_index];
-    last_entry_index = (last_entry_index + 1) % 17;
-    auto& cur_entry = hidbus_status.entries[last_entry_index];
-
-    cur_entry.is_in_focus = true;
-    cur_entry.is_connected = true;
-    cur_entry.is_connected_result = RESULT_SUCCESS;
-    cur_entry.is_enabled = true;
-    cur_entry.is_polling_mode = true;
-    cur_entry.polling_mode = JoyPollingMode::ButtonOnly;
-
-    switch (cur_entry.polling_mode) {
-    case JoyPollingMode::SixAxisSensorDisable:{
-        JoyDisableSixAxisPollingEntry disable_six_entry{};
-        std::memcpy(&cur_entry.data, &disable_six_entry, sizeof(disable_six_entry));
-        break;
-    }
-    case JoyPollingMode::SixAxisSensorEnable:{
-        JoyEnableSixAxisPollingEntry enable_sixaxis_entry{};
-        std::memcpy(&cur_entry.data, &enable_sixaxis_entry, sizeof(enable_sixaxis_entry));
-        break;
-    }
-    case JoyPollingMode::ButtonOnly:{
-        JoyButtonOnlyPollingEntry button_polling_entry{};
-        button_polling_entry.sampling_number = entry_count;
-        button_polling_entry.data.out_size = 3;
-        button_polling_entry.sampling_number = entry_count;
-        std::memcpy(&cur_entry.data, &button_polling_entry, sizeof(button_polling_entry));
-        break;
-    }
-    }
-
-    entry_count++;
-    std::memcpy(system.Kernel().GetHidSharedMem().GetPointer(), &hidbus_status,
-                sizeof(hidbus_status));
-}
 
 
 void HidBus::GetBusHandle(Kernel::HLERequestContext& ctx) {
@@ -170,6 +130,16 @@ void HidBus::Initialize(Kernel::HLERequestContext& ctx) {
               bus_handle_.abstracted_pad_id, bus_handle_.bus_type, bus_handle_.internal_index,
               bus_handle_.player_number, bus_handle_.is_valid);
 
+    for (std::size_t i = 0; i < 19; i++) {
+        hidbus_status.entries[i].is_in_focus = true;
+        hidbus_status.entries[i].is_connected = true;
+        hidbus_status.entries[i].is_connected_result = RESULT_SUCCESS;
+        hidbus_status.entries[i].is_enabled = true;
+        hidbus_status.entries[i].is_polling_mode = true;
+      //  hidbus_status.entries[i].polling_mode = JoyPollingMode::ButtonOnly;
+    }
+
+    std::memcpy(system.Kernel().GetHidBusSharedMem().GetPointer(), &hidbus_status, sizeof(hidbus_status));
     is_hidbus_enabled = true;
     IPC::ResponseBuilder rb{ctx, 2};
     rb.Push(RESULT_SUCCESS);
@@ -230,6 +200,7 @@ void HidBus::SendCommandAsync(Kernel::HLERequestContext& ctx) {
 
     IPC::ResponseBuilder rb{ctx, 2};
     rb.Push(RESULT_SUCCESS);
+    send_command_asyc_event->GetWritableEvent().Signal();
 };
 
 void HidBus::GetSendCommandAsynceResult(Kernel::HLERequestContext& ctx) {

@@ -3,6 +3,8 @@
 // Refer to the license.txt file included.
 
 #pragma once
+
+#include "core/hle/service/hid/hidbus/ringcon.h"
 #include "core/hle/service/service.h"
 
 namespace Core::Timing {
@@ -19,6 +21,13 @@ class KReadableEvent;
 } // namespace Kernel
 
 namespace Service::HID {
+
+enum class HidBusControllerTypes : std::size_t {
+    RingController,
+    Starlink,
+
+    MaxControllers,
+};
 
 class HidBus final : public ServiceFramework<HidBus> {
 public:
@@ -147,8 +156,7 @@ private:
     void SetStatusManagerType(Kernel::HLERequestContext& ctx);
 
     void UpdateHidbus(std::uintptr_t user_data, std::chrono::nanoseconds ns_late);
-    void UpdateSharedMemory(const Core::Timing::CoreTiming& core_timing);
-    // std::shared_ptr<Kernel::Handle>& GetReadableEvent();
+
     Kernel::KEvent* send_command_asyc_event;
     bool is_hidbus_enabled{false};
     bool send_command_asyc{false};
@@ -157,6 +165,8 @@ private:
     int last_entry_index = 0;
     int entry_count = 0;
     std::shared_ptr<Core::Timing::EventType> hidbus_update_event;
+
+    Ring_controller ringcon{};
 };
 
 } // namespace Service::HID

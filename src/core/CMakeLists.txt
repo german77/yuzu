@@ -425,6 +425,8 @@ add_library(core STATIC
     hle/service/hid/controllers/touchscreen.h
     hle/service/hid/controllers/xpad.cpp
     hle/service/hid/controllers/xpad.h
+    hle/service/hid/hidbus/ringcon.cpp
+    hle/service/hid/hidbus/ringcon.h
     hle/service/lbl/lbl.cpp
     hle/service/lbl/lbl.h
     hle/service/ldn/errors.h
