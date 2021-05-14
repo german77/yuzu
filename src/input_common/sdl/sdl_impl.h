@@ -67,6 +67,12 @@ private:
     void CloseJoysticks();
 
     /// Returns a custom name for specific controllers because the default name is not correct
+    bool IsJoyconLeft(SDL_GameController* controller) const;
+
+    /// Returns a custom name for specific controllers because the default name is not correct
+    bool IsJoyconRight(SDL_GameController* controller) const;
+
+    /// Returns a custom name for specific controllers because the default name is not correct
     std::string GetControllerName(SDL_GameController* controller) const;
 
     // Set to true if SDL supports game controller subsystem
