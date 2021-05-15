@@ -221,9 +221,13 @@ void HidBus::GetSendCommandAsynceResult(Kernel::HLERequestContext& ctx) {
 
 void HidBus::SetEventForSendCommandAsycResult(Kernel::HLERequestContext& ctx) {
     IPC::RequestParser rp{ctx};
-    const auto bus_handle{rp.PopRaw<HidbusBusHandle>()};
+    const auto bus_handle_{rp.PopRaw<HidbusBusHandle>()};
 
-    LOG_ERROR(Service_HID, "called");
+    LOG_ERROR(Service_HID,
+              "(STUBBED) called  abstracted_pad_id={} bus_type={} internal_index={} "
+              "player_number={} is_valid={}",
+              bus_handle_.abstracted_pad_id, bus_handle_.bus_type, bus_handle_.internal_index,
+              bus_handle_.player_number, bus_handle_.is_valid);
 
     IPC::ResponseBuilder rb{ctx, 2, 1};
     rb.Push(RESULT_SUCCESS);

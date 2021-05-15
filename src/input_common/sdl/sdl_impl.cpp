@@ -1425,6 +1425,7 @@ public:
                     analog_x_axis = axis;
                 } else if (analog_y_axis == -1 && analog_x_axis != axis) {
                     analog_y_axis = axis;
+                    break;
                 }
             } else {
                 // If the press wasn't accepted as a joy axis, check for a button press
