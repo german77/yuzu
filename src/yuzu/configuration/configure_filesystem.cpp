@@ -122,7 +122,7 @@ void ConfigureFilesystem::SetDirectory(DirectoryTarget target, QLineEdit* edit) 
         return;
     }
 
-    if (str.back() != QChar::fromLatin1('/')) {
+    if (str.back() != QChar::fromLatin1('/') && target != DirectoryTarget::TAS) {
         str.append(QChar::fromLatin1('/'));
     }
 

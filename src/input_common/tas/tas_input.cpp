@@ -13,11 +13,14 @@
 
 #include "common/settings.h"
 #include "common/logging/log.h"
+#include "common/fs/file.h"
+#include "common/fs/fs.h"
 #include "input_common/tas/tas_input.h"
-#include "common/file_util.h"
-#include <core/core.h>
-#include <core/frontend/framebuffer_layout.h>
-#include <QImage>
+
+
+/// Input Common shouldnt have core/vide_core dependencies
+#include "core/core.h"
+#include "core/frontend/framebuffer_layout.h"
 #include "video_core/renderer_base.h"
 
 namespace TasInput {
@@ -38,8 +41,12 @@ namespace TasInput {
         if (!newCommands.empty()) {
             newCommands.clear();
         }
-        std::string file = "";
-        Common::FS::ReadFileToString(false, Settings::values.tas_path, file);
+        if (Settings::values.tas_path.empty()) {
+            LOG_ERROR(Input, "No file selected");
+        }
+
+        std::string file = Common::FS::ReadStringFromFile(Settings::values.tas_path,
+                                                          Common::FS::FileType::TextFile);
         std::stringstream command_line(file);
         std::string line;
         int frameNo = 0;
@@ -86,8 +93,9 @@ namespace TasInput {
             TASCommand line = recordCommands.at(frame);
             output_text += std::to_string(frame) + " " + WriteCommandButtons(line.buttons) + " " + WriteCommandAxis(line.l_axis) + " " + WriteCommandAxis(line.r_axis);
         }
-        Common::FS::WriteStringToFile(true, Settings::values.tas_path, output_text);
-        LOG_INFO(Input, "TAS file written to file!");
+        std::size_t file_bytes = Common::FS::WriteStringToFile(
+            Settings::values.tas_path, Common::FS::FileType::TextFile, output_text);
+        LOG_INFO(Input, "TAS file written to file! {} bytes written", file_bytes);
     }
 
     void Tas::RecordInput(u32 buttons, std::array<std::pair<float, float>, 2> axes) {

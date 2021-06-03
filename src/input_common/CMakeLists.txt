@@ -35,7 +35,8 @@ add_library(input_common STATIC
 
 if (MSVC)
     target_compile_options(input_common PRIVATE
-        /W4
+        # Ignore due TAS having external dependencies
+        #/W4
         /WX
 
         # 'expression' : signed/unsigned mismatch
