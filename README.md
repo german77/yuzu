@@ -8,7 +8,7 @@ If you have any issues with this custom build, ping me (MonsterDruide1) on the [
 
 Before you can start creating a TAS by your own, you have to match a few settings in the configuration of Yuzu:
 1. Open the configuration menu using `Emulation` -> `Configure...`.
-2. On the first page (`General` -> `General`), disable `Multicore CPU Emulation` and `Pause emulation when in background`.
+2. On the first page (`General` -> `General`), disable `Pause emulation when in background`.
 3. Next, go to `System` -> `Filesystem`, and select the path to your script at the very bottom.
 4. In the config of `CPU` -> `CPU`, the accuracy should be on `Accurate`.
 5. (optional) For a small speed boost, you can set `Graphics` -> `Advanced` -> `Accuracy Level` to `Normal`. 
