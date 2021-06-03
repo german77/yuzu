@@ -34,7 +34,7 @@ private:
         controller.SetPerformanceConfiguration(mode, config);
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void GetPerformanceConfiguration(Kernel::HLERequestContext& ctx) {
@@ -44,7 +44,7 @@ private:
         LOG_DEBUG(Service_APM, "called mode={}", mode);
 
         IPC::ResponseBuilder rb{ctx, 3};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.PushEnum(controller.GetCurrentPerformanceConfiguration(mode));
     }
 
@@ -68,7 +68,7 @@ void APM::OpenSession(Kernel::HLERequestContext& ctx) {
     LOG_DEBUG(Service_APM, "called");
 
     IPC::ResponseBuilder rb{ctx, 2, 0, 1};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.PushIpcInterface<ISession>(system, controller);
 }
 
@@ -83,7 +83,7 @@ void APM::IsCpuOverclockEnabled(Kernel::HLERequestContext& ctx) {
     LOG_WARNING(Service_APM, "(STUBBED) called");
 
     IPC::ResponseBuilder rb{ctx, 3};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.Push(false);
 }
 
@@ -111,7 +111,7 @@ void APM_Sys::GetPerformanceEvent(Kernel::HLERequestContext& ctx) {
     LOG_DEBUG(Service_APM, "called");
 
     IPC::ResponseBuilder rb{ctx, 2, 0, 1};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.PushIpcInterface<ISession>(system, controller);
 }
 
@@ -125,14 +125,14 @@ void APM_Sys::SetCpuBoostMode(Kernel::HLERequestContext& ctx) {
     controller.SetFromCpuBoostMode(mode);
 
     IPC::ResponseBuilder rb{ctx, 2};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
 }
 
 void APM_Sys::GetCurrentPerformanceConfiguration(Kernel::HLERequestContext& ctx) {
     LOG_DEBUG(Service_APM, "called");
 
     IPC::ResponseBuilder rb{ctx, 3};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.PushEnum(
         controller.GetCurrentPerformanceConfiguration(controller.GetCurrentPerformanceMode()));
 }

@@ -7,7 +7,7 @@
 #include <memory>
 #include <optional>
 
-#include <dynarmic/A32/coprocessor.h>
+#include <dynarmic/interface/A32/coprocessor.h>
 #include "common/common_types.h"
 
 namespace Core {
@@ -18,7 +18,7 @@ class DynarmicCP15 final : public Dynarmic::A32::Coprocessor {
 public:
     using CoprocReg = Dynarmic::A32::CoprocReg;
 
-    explicit DynarmicCP15(ARM_Dynarmic_32& parent) : parent(parent) {}
+    explicit DynarmicCP15(ARM_Dynarmic_32& parent_) : parent{parent_} {}
 
     std::optional<Callback> CompileInternalOperation(bool two, unsigned opc1, CoprocReg CRd,
                                                      CoprocReg CRn, CoprocReg CRm,

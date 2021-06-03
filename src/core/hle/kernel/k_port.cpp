@@ -56,13 +56,10 @@ ResultCode KPort::EnqueueSession(KServerSession* session) {
 
     R_UNLESS(state == State::Normal, ResultPortClosed);
 
-    if (server.HasHLEHandler()) {
-        server.GetHLEHandler()->ClientConnected(session);
-    } else {
-        server.EnqueueSession(session);
-    }
+    server.EnqueueSession(session);
+    server.GetSessionRequestHandler()->ClientConnected(server.AcceptSession());
 
-    return RESULT_SUCCESS;
+    return ResultSuccess;
 }
 
 } // namespace Kernel

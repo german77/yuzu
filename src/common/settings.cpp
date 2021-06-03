@@ -5,7 +5,7 @@
 #include <string_view>
 
 #include "common/assert.h"
-#include "common/file_util.h"
+#include "common/fs/path_util.h"
 #include "common/logging/log.h"
 #include "common/settings.h"
 
@@ -34,6 +34,10 @@ void LogSettings() {
         LOG_INFO(Config, "{}: {}", name, value);
     };
 
+    const auto log_path = [](std::string_view name, const std::filesystem::path& path) {
+        LOG_INFO(Config, "{}: {}", name, Common::FS::PathToUTF8String(path));
+    };
+
     LOG_INFO(Config, "yuzu Configuration:");
     log_setting("Controls_UseDockedMode", values.use_docked_mode.GetValue());
     log_setting("System_RngSeed", values.rng_seed.GetValue().value_or(0));
@@ -42,7 +46,7 @@ void LogSettings() {
     log_setting("System_RegionIndex", values.region_index.GetValue());
     log_setting("System_TimeZoneIndex", values.time_zone_index.GetValue());
     log_setting("Core_UseMultiCore", values.use_multi_core.GetValue());
-    log_setting("CPU_Accuracy", values.cpu_accuracy);
+    log_setting("CPU_Accuracy", values.cpu_accuracy.GetValue());
     log_setting("Renderer_UseResolutionFactor", values.resolution_factor.GetValue());
     log_setting("Renderer_UseFrameLimit", values.use_frame_limit.GetValue());
     log_setting("Renderer_FrameLimit", values.frame_limit.GetValue());
@@ -59,11 +63,11 @@ void LogSettings() {
     log_setting("Audio_EnableAudioStretching", values.enable_audio_stretching.GetValue());
     log_setting("Audio_OutputDevice", values.audio_device_id);
     log_setting("DataStorage_UseVirtualSd", values.use_virtual_sd);
-    log_setting("DataStorage_CacheDir", Common::FS::GetUserPath(Common::FS::UserPath::CacheDir));
-    log_setting("DataStorage_ConfigDir", Common::FS::GetUserPath(Common::FS::UserPath::ConfigDir));
-    log_setting("DataStorage_LoadDir", Common::FS::GetUserPath(Common::FS::UserPath::LoadDir));
-    log_setting("DataStorage_NandDir", Common::FS::GetUserPath(Common::FS::UserPath::NANDDir));
-    log_setting("DataStorage_SdmcDir", Common::FS::GetUserPath(Common::FS::UserPath::SDMCDir));
+    log_path("DataStorage_CacheDir", Common::FS::GetYuzuPath(Common::FS::YuzuPath::CacheDir));
+    log_path("DataStorage_ConfigDir", Common::FS::GetYuzuPath(Common::FS::YuzuPath::ConfigDir));
+    log_path("DataStorage_LoadDir", Common::FS::GetYuzuPath(Common::FS::YuzuPath::LoadDir));
+    log_path("DataStorage_NANDDir", Common::FS::GetYuzuPath(Common::FS::YuzuPath::NANDDir));
+    log_path("DataStorage_SDMCDir", Common::FS::GetYuzuPath(Common::FS::YuzuPath::SDMCDir));
     log_setting("Debugging_ProgramArgs", values.program_args);
     log_setting("Services_BCATBackend", values.bcat_backend);
     log_setting("Services_BCATBoxcatLocal", values.bcat_boxcat_local);
@@ -106,6 +110,12 @@ void RestoreGlobalState(bool is_powered_on) {
     // Core
     values.use_multi_core.SetGlobal(true);
 
+    // CPU
+    values.cpu_accuracy.SetGlobal(true);
+    values.cpuopt_unsafe_unfuse_fma.SetGlobal(true);
+    values.cpuopt_unsafe_reduce_fp_error.SetGlobal(true);
+    values.cpuopt_unsafe_inaccurate_nan.SetGlobal(true);
+
     // Renderer
     values.renderer_backend.SetGlobal(true);
     values.vulkan_device.SetGlobal(true);
@@ -130,7 +140,6 @@ void RestoreGlobalState(bool is_powered_on) {
     values.region_index.SetGlobal(true);
     values.time_zone_index.SetGlobal(true);
     values.rng_seed.SetGlobal(true);
-    values.custom_rtc.SetGlobal(true);
     values.sound_index.SetGlobal(true);
 
     // Controls

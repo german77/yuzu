@@ -11,7 +11,8 @@
 #include <string>
 #include <type_traits>
 #include <vector>
-#include <boost/container/small_vector.hpp>
+
+#include "common/assert.h"
 #include "common/common_types.h"
 #include "common/concepts.h"
 #include "common/swap.h"
@@ -66,7 +67,8 @@ public:
      * this request (ServerSession, Originator thread, Translated command buffer, etc).
      * @returns ResultCode the result code of the translate operation.
      */
-    virtual ResultCode HandleSyncRequest(Kernel::HLERequestContext& context) = 0;
+    virtual ResultCode HandleSyncRequest(Kernel::KServerSession& session,
+                                         Kernel::HLERequestContext& context) = 0;
 
     /**
      * Signals that a client has just connected to this HLE handler and keeps the
@@ -81,6 +83,69 @@ public:
      * @param server_session ServerSession associated with the connection.
      */
     void ClientDisconnected(KServerSession* session);
+};
+
+using SessionRequestHandlerPtr = std::shared_ptr<SessionRequestHandler>;
+
+/**
+ * Manages the underlying HLE requests for a session, and whether (or not) the session should be
+ * treated as a domain. This is managed separately from server sessions, as this state is shared
+ * when objects are cloned.
+ */
+class SessionRequestManager final {
+public:
+    SessionRequestManager() = default;
+
+    bool IsDomain() const {
+        return is_domain;
+    }
+
+    void ConvertToDomain() {
+        domain_handlers = {session_handler};
+        is_domain = true;
+    }
+
+    std::size_t DomainHandlerCount() const {
+        return domain_handlers.size();
+    }
+
+    bool HasSessionHandler() const {
+        return session_handler != nullptr;
+    }
+
+    SessionRequestHandler& SessionHandler() {
+        return *session_handler;
+    }
+
+    const SessionRequestHandler& SessionHandler() const {
+        return *session_handler;
+    }
+
+    void CloseDomainHandler(std::size_t index) {
+        if (index < DomainHandlerCount()) {
+            domain_handlers[index] = nullptr;
+        } else {
+            UNREACHABLE_MSG("Unexpected handler index {}", index);
+        }
+    }
+
+    SessionRequestHandlerPtr DomainHandler(std::size_t index) const {
+        ASSERT_MSG(index < DomainHandlerCount(), "Unexpected handler index {}", index);
+        return domain_handlers.at(index);
+    }
+
+    void AppendDomainHandler(SessionRequestHandlerPtr&& handler) {
+        domain_handlers.emplace_back(std::move(handler));
+    }
+
+    void SetSessionHandler(SessionRequestHandlerPtr&& handler) {
+        session_handler = std::move(handler);
+    }
+
+private:
+    bool is_domain{};
+    SessionRequestHandlerPtr session_handler;
+    std::vector<SessionRequestHandlerPtr> domain_handlers;
 };
 
 /**
@@ -128,15 +193,32 @@ public:
     /// Writes data from this context back to the requesting process/thread.
     ResultCode WriteToOutgoingCommandBuffer(KThread& requesting_thread);
 
-    u32_le GetCommand() const {
+    u32_le GetHipcCommand() const {
         return command;
+    }
+
+    u32_le GetTipcCommand() const {
+        return static_cast<u32_le>(command_header->type.Value()) -
+               static_cast<u32_le>(IPC::CommandType::TIPC_CommandRegion);
+    }
+
+    u32_le GetCommand() const {
+        return command_header->IsTipc() ? GetTipcCommand() : GetHipcCommand();
+    }
+
+    bool IsTipc() const {
+        return command_header->IsTipc();
     }
 
     IPC::CommandType GetCommandType() const {
         return command_header->type;
     }
 
-    unsigned GetDataPayloadOffset() const {
+    u64 GetPID() const {
+        return pid;
+    }
+
+    u32 GetDataPayloadOffset() const {
         return data_payload_offset;
     }
 
@@ -206,53 +288,32 @@ public:
     bool CanWriteBuffer(std::size_t buffer_index = 0) const;
 
     Handle GetCopyHandle(std::size_t index) const {
-        return copy_handles.at(index);
+        return incoming_copy_handles.at(index);
     }
 
     Handle GetMoveHandle(std::size_t index) const {
-        return move_handles.at(index);
+        return incoming_move_handles.at(index);
     }
 
     void AddMoveObject(KAutoObject* object) {
-        move_objects.emplace_back(object);
+        outgoing_move_objects.emplace_back(object);
     }
 
     void AddCopyObject(KAutoObject* object) {
-        copy_objects.emplace_back(object);
+        outgoing_copy_objects.emplace_back(object);
     }
 
-    void AddDomainObject(std::shared_ptr<SessionRequestHandler> object) {
-        domain_objects.emplace_back(std::move(object));
+    void AddDomainObject(SessionRequestHandlerPtr object) {
+        outgoing_domain_objects.emplace_back(std::move(object));
     }
 
     template <typename T>
-    std::shared_ptr<T> GetDomainRequestHandler(std::size_t index) const {
-        return std::static_pointer_cast<T>(domain_request_handlers.at(index));
+    std::shared_ptr<T> GetDomainHandler(std::size_t index) const {
+        return std::static_pointer_cast<T>(manager->DomainHandler(index));
     }
 
-    void SetDomainRequestHandlers(
-        const std::vector<std::shared_ptr<SessionRequestHandler>>& handlers) {
-        domain_request_handlers = handlers;
-    }
-
-    /// Clears the list of objects so that no lingering objects are written accidentally to the
-    /// response buffer.
-    void ClearIncomingObjects() {
-        move_objects.clear();
-        copy_objects.clear();
-        domain_objects.clear();
-    }
-
-    std::size_t NumMoveObjects() const {
-        return move_objects.size();
-    }
-
-    std::size_t NumCopyObjects() const {
-        return copy_objects.size();
-    }
-
-    std::size_t NumDomainObjects() const {
-        return domain_objects.size();
+    void SetSessionRequestManager(std::shared_ptr<SessionRequestManager> manager_) {
+        manager = std::move(manager_);
     }
 
     std::string Description() const;
@@ -274,12 +335,12 @@ private:
     Kernel::KServerSession* server_session{};
     KThread* thread;
 
-    // TODO(yuriks): Check common usage of this and optimize size accordingly
-    boost::container::small_vector<Handle, 8> move_handles;
-    boost::container::small_vector<Handle, 8> copy_handles;
-    boost::container::small_vector<KAutoObject*, 8> move_objects;
-    boost::container::small_vector<KAutoObject*, 8> copy_objects;
-    boost::container::small_vector<std::shared_ptr<SessionRequestHandler>, 8> domain_objects;
+    std::vector<Handle> incoming_move_handles;
+    std::vector<Handle> incoming_copy_handles;
+
+    std::vector<KAutoObject*> outgoing_move_objects;
+    std::vector<KAutoObject*> outgoing_copy_objects;
+    std::vector<SessionRequestHandlerPtr> outgoing_domain_objects;
 
     std::optional<IPC::CommandHeader> command_header;
     std::optional<IPC::HandleDescriptorHeader> handle_descriptor_header;
@@ -291,11 +352,14 @@ private:
     std::vector<IPC::BufferDescriptorABW> buffer_w_desciptors;
     std::vector<IPC::BufferDescriptorC> buffer_c_desciptors;
 
-    unsigned data_payload_offset{};
-    unsigned buffer_c_offset{};
     u32_le command{};
+    u64 pid{};
+    u32 write_size{};
+    u32 data_payload_offset{};
+    u32 handles_offset{};
+    u32 domain_offset{};
 
-    std::vector<std::shared_ptr<SessionRequestHandler>> domain_request_handlers;
+    std::shared_ptr<SessionRequestManager> manager;
     bool is_thread_waiting{};
 
     KernelCore& kernel;

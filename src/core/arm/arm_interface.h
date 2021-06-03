@@ -65,9 +65,6 @@ public:
     /// Step CPU by one instruction
     virtual void Step() = 0;
 
-    /// Exits execution from a callback, the callback must rewind the stack
-    virtual void ExceptionalExit() = 0;
-
     /// Clear all instruction cache
     virtual void ClearInstructionCache() = 0;
 
@@ -158,8 +155,6 @@ public:
      * @param value The new value to place in the register.
      */
     virtual void SetTPIDR_EL0(u64 value) = 0;
-
-    virtual void ChangeProcessorID(std::size_t new_core_id) = 0;
 
     virtual void SaveContext(ThreadContext32& ctx) = 0;
     virtual void SaveContext(ThreadContext64& ctx) = 0;

@@ -12,13 +12,13 @@ namespace Service::Time::Clock {
 
 class NetworkSystemClockContextWriter final : public SystemClockContextUpdateCallback {
 public:
-    explicit NetworkSystemClockContextWriter(SharedMemory& shared_memory)
-        : SystemClockContextUpdateCallback{}, shared_memory{shared_memory} {}
+    explicit NetworkSystemClockContextWriter(SharedMemory& shared_memory_)
+        : SystemClockContextUpdateCallback{}, shared_memory{shared_memory_} {}
 
 protected:
     ResultCode Update() override {
         shared_memory.UpdateNetworkSystemClockContext(context);
-        return RESULT_SUCCESS;
+        return ResultSuccess;
     }
 
 private:

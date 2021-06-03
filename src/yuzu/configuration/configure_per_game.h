@@ -5,6 +5,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <QDialog>
@@ -27,7 +28,8 @@ class ConfigurePerGame : public QDialog {
     Q_OBJECT
 
 public:
-    explicit ConfigurePerGame(QWidget* parent, u64 title_id);
+    // Cannot use std::filesystem::path due to https://bugreports.qt.io/browse/QTBUG-73263
+    explicit ConfigurePerGame(QWidget* parent, u64 title_id, const std::string& file_name);
     ~ConfigurePerGame() override;
 
     /// Save all button configurations to settings file
@@ -38,6 +40,8 @@ public:
 private:
     void changeEvent(QEvent* event) override;
     void RetranslateUI();
+
+    void HandleApplyButtonClicked();
 
     void LoadConfiguration();
 

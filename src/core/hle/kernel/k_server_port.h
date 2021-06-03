@@ -25,33 +25,28 @@ class SessionRequestHandler;
 class KServerPort final : public KSynchronizationObject {
     KERNEL_AUTOOBJECT_TRAITS(KServerPort, KSynchronizationObject);
 
-private:
-    using SessionList = boost::intrusive::list<KServerSession>;
-
 public:
     explicit KServerPort(KernelCore& kernel_);
-    virtual ~KServerPort() override;
-
-    using HLEHandler = std::shared_ptr<SessionRequestHandler>;
+    ~KServerPort() override;
 
     void Initialize(KPort* parent_, std::string&& name_);
 
     /// Whether or not this server port has an HLE handler available.
-    bool HasHLEHandler() const {
-        return hle_handler != nullptr;
+    bool HasSessionRequestHandler() const {
+        return session_handler != nullptr;
     }
 
     /// Gets the HLE handler for this port.
-    HLEHandler GetHLEHandler() const {
-        return hle_handler;
+    SessionRequestHandlerPtr GetSessionRequestHandler() const {
+        return session_handler;
     }
 
     /**
      * Sets the HLE handler template for the port. ServerSessions crated by connecting to this port
      * will inherit a reference to this handler.
      */
-    void SetHleHandler(HLEHandler hle_handler_) {
-        hle_handler = std::move(hle_handler_);
+    void SetSessionHandler(SessionRequestHandlerPtr&& handler) {
+        session_handler = std::move(handler);
     }
 
     void EnqueueSession(KServerSession* pending_session);
@@ -65,15 +60,16 @@ public:
     bool IsLight() const;
 
     // Overridden virtual functions.
-    virtual void Destroy() override;
-    virtual bool IsSignaled() const override;
+    void Destroy() override;
+    bool IsSignaled() const override;
 
 private:
+    using SessionList = boost::intrusive::list<KServerSession>;
+
     void CleanupSessions();
 
-private:
     SessionList session_list;
-    HLEHandler hle_handler;
+    SessionRequestHandlerPtr session_handler;
     KPort* parent{};
 };
 

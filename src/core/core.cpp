@@ -6,7 +6,7 @@
 #include <memory>
 #include <utility>
 
-#include "common/file_util.h"
+#include "common/fs/fs.h"
 #include "common/logging/log.h"
 #include "common/microprofile.h"
 #include "common/settings.h"
@@ -121,7 +121,7 @@ FileSys::VirtualFile GetGameFileFromPath(const FileSys::VirtualFilesystem& vfs,
                                                                   dir->GetName());
     }
 
-    if (Common::FS::IsDirectory(path)) {
+    if (Common::FS::IsDir(path)) {
         return vfs->OpenFile(path + "/main", FileSys::Mode::Read);
     }
 
@@ -173,7 +173,7 @@ struct System::Impl {
         const auto current_time = std::chrono::duration_cast<std::chrono::seconds>(
             std::chrono::system_clock::now().time_since_epoch());
         Settings::values.custom_rtc_differential =
-            Settings::values.custom_rtc.GetValue().value_or(current_time) - current_time;
+            Settings::values.custom_rtc.value_or(current_time) - current_time;
 
         // Create a default fs if one doesn't already exist.
         if (virtual_filesystem == nullptr)
@@ -289,7 +289,8 @@ struct System::Impl {
 
             telemetry_session->AddField(performance, "Shutdown_EmulationSpeed",
                                         perf_results.emulation_speed * 100.0);
-            telemetry_session->AddField(performance, "Shutdown_Framerate", perf_results.game_fps);
+            telemetry_session->AddField(performance, "Shutdown_Framerate",
+                                        perf_results.average_game_fps);
             telemetry_session->AddField(performance, "Shutdown_Frametime",
                                         perf_results.frametime * 1000.0);
             telemetry_session->AddField(performance, "Mean_Frametime_MS",

@@ -56,7 +56,7 @@ enum class ErrorModule : u32 {
     PCIe = 120,
     Friends = 121,
     BCAT = 122,
-    SSL = 123,
+    SSLSrv = 123,
     Account = 124,
     News = 125,
     Mii = 126,
@@ -144,7 +144,7 @@ constexpr bool operator!=(const ResultCode& a, const ResultCode& b) {
 // Convenience functions for creating some common kinds of errors:
 
 /// The default success `ResultCode`.
-constexpr ResultCode RESULT_SUCCESS(0);
+constexpr ResultCode ResultSuccess(0);
 
 /**
  * Placeholder result code used for unknown error codes.
@@ -152,7 +152,7 @@ constexpr ResultCode RESULT_SUCCESS(0);
  * @note This should only be used when a particular error code
  *       is not known yet.
  */
-constexpr ResultCode RESULT_UNKNOWN(UINT32_MAX);
+constexpr ResultCode ResultUnknown(UINT32_MAX);
 
 /**
  * This is an optional value type. It holds a `ResultCode` and, if that code is a success code,
@@ -191,7 +191,7 @@ class ResultVal {
 public:
     /// Constructs an empty `ResultVal` with the given error code. The code must not be a success
     /// code.
-    ResultVal(ResultCode error_code = RESULT_UNKNOWN) : result_code(error_code) {
+    ResultVal(ResultCode error_code = ResultUnknown) : result_code(error_code) {
         ASSERT(error_code.IsError());
     }
 
@@ -321,7 +321,7 @@ private:
  */
 template <typename T, typename... Args>
 ResultVal<T> MakeResult(Args&&... args) {
-    return ResultVal<T>::WithCode(RESULT_SUCCESS, std::forward<Args>(args)...);
+    return ResultVal<T>::WithCode(ResultSuccess, std::forward<Args>(args)...);
 }
 
 /**
@@ -330,8 +330,7 @@ ResultVal<T> MakeResult(Args&&... args) {
  */
 template <typename Arg>
 ResultVal<std::remove_reference_t<Arg>> MakeResult(Arg&& arg) {
-    return ResultVal<std::remove_reference_t<Arg>>::WithCode(RESULT_SUCCESS,
-                                                             std::forward<Arg>(arg));
+    return ResultVal<std::remove_reference_t<Arg>>::WithCode(ResultSuccess, std::forward<Arg>(arg));
 }
 
 /**
@@ -358,3 +357,28 @@ ResultVal<std::remove_reference_t<Arg>> MakeResult(Arg&& arg) {
             return CONCAT2(check_result_L, __LINE__);                                              \
         }                                                                                          \
     } while (false)
+
+#define R_SUCCEEDED(res) (res.IsSuccess())
+
+/// Evaluates a boolean expression, and succeeds if that expression is true.
+#define R_SUCCEED_IF(expr) R_UNLESS(!(expr), ResultSuccess)
+
+/// Evaluates a boolean expression, and returns a result unless that expression is true.
+#define R_UNLESS(expr, res)                                                                        \
+    {                                                                                              \
+        if (!(expr)) {                                                                             \
+            if (res.IsError()) {                                                                   \
+                LOG_ERROR(Kernel, "Failed with result: {}", res.raw);                              \
+            }                                                                                      \
+            return res;                                                                            \
+        }                                                                                          \
+    }
+
+/// Evaluates an expression that returns a result, and returns the result if it would fail.
+#define R_TRY(res_expr)                                                                            \
+    {                                                                                              \
+        const auto _tmp_r_try_rc = (res_expr);                                                     \
+        if (_tmp_r_try_rc.IsError()) {                                                             \
+            return _tmp_r_try_rc;                                                                  \
+        }                                                                                          \
+    }

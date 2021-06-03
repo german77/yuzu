@@ -4,9 +4,9 @@
 
 #include <algorithm>
 #include <array>
-#include "common/common_paths.h"
 #include "common/common_types.h"
-#include "common/file_util.h"
+#include "common/fs/file.h"
+#include "common/fs/path_util.h"
 #include "common/logging/log.h"
 #include "common/string_util.h"
 #include "common/swap.h"
@@ -41,9 +41,9 @@ constexpr ResultCode ERR_FAILED_SAVE_DATA{ErrorModule::Account, 100};
 // Thumbnails are hard coded to be at least this size
 constexpr std::size_t THUMBNAIL_SIZE = 0x24000;
 
-static std::string GetImagePath(Common::UUID uuid) {
-    return Common::FS::GetUserPath(Common::FS::UserPath::NANDDir) +
-           "/system/save/8000000000000010/su/avators/" + uuid.FormatSwitch() + ".jpg";
+static std::filesystem::path GetImagePath(Common::UUID uuid) {
+    return Common::FS::GetYuzuPath(Common::FS::YuzuPath::NANDDir) /
+           fmt::format("system/save/8000000000000010/su/avators/{}.jpg", uuid.FormatSwitch());
 }
 
 static constexpr u32 SanitizeJPEGSize(std::size_t size) {
@@ -298,13 +298,13 @@ protected:
         if (profile_manager.GetProfileBaseAndData(user_id, profile_base, data)) {
             ctx.WriteBuffer(data);
             IPC::ResponseBuilder rb{ctx, 16};
-            rb.Push(RESULT_SUCCESS);
+            rb.Push(ResultSuccess);
             rb.PushRaw(profile_base);
         } else {
             LOG_ERROR(Service_ACC, "Failed to get profile base and data for user={}",
                       user_id.Format());
             IPC::ResponseBuilder rb{ctx, 2};
-            rb.Push(RESULT_UNKNOWN); // TODO(ogniK): Get actual error code
+            rb.Push(ResultUnknown); // TODO(ogniK): Get actual error code
         }
     }
 
@@ -313,12 +313,12 @@ protected:
         ProfileBase profile_base{};
         if (profile_manager.GetProfileBase(user_id, profile_base)) {
             IPC::ResponseBuilder rb{ctx, 16};
-            rb.Push(RESULT_SUCCESS);
+            rb.Push(ResultSuccess);
             rb.PushRaw(profile_base);
         } else {
             LOG_ERROR(Service_ACC, "Failed to get profile base for user={}", user_id.Format());
             IPC::ResponseBuilder rb{ctx, 2};
-            rb.Push(RESULT_UNKNOWN); // TODO(ogniK): Get actual error code
+            rb.Push(ResultUnknown); // TODO(ogniK): Get actual error code
         }
     }
 
@@ -326,9 +326,10 @@ protected:
         LOG_DEBUG(Service_ACC, "called");
 
         IPC::ResponseBuilder rb{ctx, 3};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
 
-        const Common::FS::IOFile image(GetImagePath(user_id), "rb");
+        const Common::FS::IOFile image(GetImagePath(user_id), Common::FS::FileAccessMode::Read,
+                                       Common::FS::FileType::BinaryFile);
         if (!image.IsOpen()) {
             LOG_WARNING(Service_ACC,
                         "Failed to load user provided image! Falling back to built-in backup...");
@@ -339,7 +340,10 @@ protected:
 
         const u32 size = SanitizeJPEGSize(image.GetSize());
         std::vector<u8> buffer(size);
-        image.ReadBytes(buffer.data(), buffer.size());
+
+        if (image.Read(buffer) != buffer.size()) {
+            LOG_ERROR(Service_ACC, "Failed to read all the bytes in the user provided image.");
+        }
 
         ctx.WriteBuffer(buffer);
         rb.Push<u32>(size);
@@ -348,9 +352,10 @@ protected:
     void GetImageSize(Kernel::HLERequestContext& ctx) {
         LOG_DEBUG(Service_ACC, "called");
         IPC::ResponseBuilder rb{ctx, 3};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
 
-        const Common::FS::IOFile image(GetImagePath(user_id), "rb");
+        const Common::FS::IOFile image(GetImagePath(user_id), Common::FS::FileAccessMode::Read,
+                                       Common::FS::FileType::BinaryFile);
 
         if (!image.IsOpen()) {
             LOG_WARNING(Service_ACC,
@@ -390,7 +395,7 @@ protected:
         }
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void StoreWithImage(Kernel::HLERequestContext& ctx) {
@@ -415,10 +420,11 @@ protected:
         ProfileData data;
         std::memcpy(&data, user_data.data(), sizeof(ProfileData));
 
-        Common::FS::IOFile image(GetImagePath(user_id), "wb");
+        Common::FS::IOFile image(GetImagePath(user_id), Common::FS::FileAccessMode::Write,
+                                 Common::FS::FileType::BinaryFile);
 
-        if (!image.IsOpen() || !image.Resize(image_data.size()) ||
-            image.WriteBytes(image_data.data(), image_data.size()) != image_data.size() ||
+        if (!image.IsOpen() || !image.SetSize(image_data.size()) ||
+            image.Write(image_data) != image_data.size() ||
             !profile_manager.SetProfileBaseAndData(user_id, base, data)) {
             LOG_ERROR(Service_ACC, "Failed to update profile data, base, and image!");
             IPC::ResponseBuilder rb{ctx, 2};
@@ -427,7 +433,7 @@ protected:
         }
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     ProfileManager& profile_manager;
@@ -522,7 +528,7 @@ private:
     void CheckAvailability(Kernel::HLERequestContext& ctx) {
         LOG_WARNING(Service_ACC, "(STUBBED) called");
         IPC::ResponseBuilder rb{ctx, 3};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push(false); // TODO: Check when this is supposed to return true and when not
     }
 
@@ -530,7 +536,7 @@ private:
         LOG_DEBUG(Service_ACC, "called");
 
         IPC::ResponseBuilder rb{ctx, 4};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.PushRaw<u64>(user_id.GetNintendoID());
     }
 
@@ -546,14 +552,14 @@ private:
         }
 
         IPC::ResponseBuilder rb{ctx, 4};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.PushRaw<u64>(user_id.GetNintendoID());
     }
 
     void StoreOpenContext(Kernel::HLERequestContext& ctx) {
         LOG_WARNING(Service_ACC, "(STUBBED) called");
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     Common::UUID user_id{Common::INVALID_UUID};
@@ -649,7 +655,7 @@ public:
 void Module::Interface::GetUserCount(Kernel::HLERequestContext& ctx) {
     LOG_DEBUG(Service_ACC, "called");
     IPC::ResponseBuilder rb{ctx, 3};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.Push<u32>(static_cast<u32>(profile_manager->GetUserCount()));
 }
 
@@ -659,7 +665,7 @@ void Module::Interface::GetUserExistence(Kernel::HLERequestContext& ctx) {
     LOG_DEBUG(Service_ACC, "called user_id={}", user_id.Format());
 
     IPC::ResponseBuilder rb{ctx, 3};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.Push(profile_manager->UserExists(user_id));
 }
 
@@ -667,20 +673,20 @@ void Module::Interface::ListAllUsers(Kernel::HLERequestContext& ctx) {
     LOG_DEBUG(Service_ACC, "called");
     ctx.WriteBuffer(profile_manager->GetAllUsers());
     IPC::ResponseBuilder rb{ctx, 2};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
 }
 
 void Module::Interface::ListOpenUsers(Kernel::HLERequestContext& ctx) {
     LOG_DEBUG(Service_ACC, "called");
     ctx.WriteBuffer(profile_manager->GetOpenUsers());
     IPC::ResponseBuilder rb{ctx, 2};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
 }
 
 void Module::Interface::GetLastOpenedUser(Kernel::HLERequestContext& ctx) {
     LOG_DEBUG(Service_ACC, "called");
     IPC::ResponseBuilder rb{ctx, 6};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.PushRaw<Common::UUID>(profile_manager->GetLastOpenedUser());
 }
 
@@ -690,14 +696,14 @@ void Module::Interface::GetProfile(Kernel::HLERequestContext& ctx) {
     LOG_DEBUG(Service_ACC, "called user_id={}", user_id.Format());
 
     IPC::ResponseBuilder rb{ctx, 2, 0, 1};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.PushIpcInterface<IProfile>(system, user_id, *profile_manager);
 }
 
 void Module::Interface::IsUserRegistrationRequestPermitted(Kernel::HLERequestContext& ctx) {
     LOG_WARNING(Service_ACC, "(STUBBED) called");
     IPC::ResponseBuilder rb{ctx, 3};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.Push(profile_manager->CanSystemRegisterUser());
 }
 
@@ -755,13 +761,13 @@ ResultCode Module::Interface::InitializeApplicationInfoBase() {
     LOG_WARNING(Service_ACC, "ApplicationInfo init required");
     // TODO(ogniK): Actual initalization here
 
-    return RESULT_SUCCESS;
+    return ResultSuccess;
 }
 
 void Module::Interface::GetBaasAccountManagerForApplication(Kernel::HLERequestContext& ctx) {
     LOG_DEBUG(Service_ACC, "called");
     IPC::ResponseBuilder rb{ctx, 2, 0, 1};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.PushIpcInterface<IManagerForApplication>(system, profile_manager->GetLastOpenedUser());
 }
 
@@ -788,7 +794,7 @@ void Module::Interface::IsUserAccountSwitchLocked(Kernel::HLERequestContext& ctx
     }
 
     IPC::ResponseBuilder rb{ctx, 3};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.Push(is_locked);
 }
 
@@ -799,7 +805,7 @@ void Module::Interface::GetProfileEditor(Kernel::HLERequestContext& ctx) {
     LOG_DEBUG(Service_ACC, "called, user_id={}", user_id.Format());
 
     IPC::ResponseBuilder rb{ctx, 2, 0, 1};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.PushIpcInterface<IProfileEditor>(system, user_id, *profile_manager);
 }
 
@@ -811,7 +817,7 @@ void Module::Interface::ListQualifiedUsers(Kernel::HLERequestContext& ctx) {
     // the game regardless of parental control settings.
     ctx.WriteBuffer(profile_manager->GetAllUsers());
     IPC::ResponseBuilder rb{ctx, 2};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
 }
 
 void Module::Interface::LoadOpenContext(Kernel::HLERequestContext& ctx) {
@@ -821,7 +827,7 @@ void Module::Interface::LoadOpenContext(Kernel::HLERequestContext& ctx) {
     // This command is used concurrently with ListOpenContextStoredUsers
     // TODO: Find the differences between this and GetBaasAccountManagerForApplication
     IPC::ResponseBuilder rb{ctx, 2, 0, 1};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.PushIpcInterface<IManagerForApplication>(system, profile_manager->GetLastOpenedUser());
 }
 
@@ -831,7 +837,7 @@ void Module::Interface::ListOpenContextStoredUsers(Kernel::HLERequestContext& ct
     // TODO(ogniK): Handle open contexts
     ctx.WriteBuffer(profile_manager->GetOpenUsers());
     IPC::ResponseBuilder rb{ctx, 2};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
 }
 
 void Module::Interface::StoreSaveDataThumbnailApplication(Kernel::HLERequestContext& ctx) {
@@ -880,7 +886,7 @@ void Module::Interface::StoreSaveDataThumbnail(Kernel::HLERequestContext& ctx,
     }
 
     // TODO(ogniK): Construct save data thumbnail
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
 }
 
 void Module::Interface::TrySelectUserWithoutInteraction(Kernel::HLERequestContext& ctx) {
@@ -889,7 +895,7 @@ void Module::Interface::TrySelectUserWithoutInteraction(Kernel::HLERequestContex
     // access to use the network or not by the looks of it
     IPC::ResponseBuilder rb{ctx, 6};
     if (profile_manager->GetUserCount() != 1) {
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.PushRaw<u128>(Common::INVALID_UUID);
         return;
     }
@@ -897,13 +903,13 @@ void Module::Interface::TrySelectUserWithoutInteraction(Kernel::HLERequestContex
     const auto user_list = profile_manager->GetAllUsers();
     if (std::all_of(user_list.begin(), user_list.end(),
                     [](const auto& user) { return user.uuid == Common::INVALID_UUID; })) {
-        rb.Push(RESULT_UNKNOWN); // TODO(ogniK): Find the correct error code
+        rb.Push(ResultUnknown); // TODO(ogniK): Find the correct error code
         rb.PushRaw<u128>(Common::INVALID_UUID);
         return;
     }
 
     // Select the first user we have
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.PushRaw<u128>(profile_manager->GetUser(0)->uuid);
 }
 

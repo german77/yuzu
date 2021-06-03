@@ -31,12 +31,12 @@ std::optional<Kernel::KProcess*> SearchProcessList(
 
 void GetApplicationPidGeneric(Kernel::HLERequestContext& ctx,
                               const std::vector<Kernel::KProcess*>& process_list) {
-    const auto process = SearchProcessList(process_list, [](const auto& process) {
-        return process->GetProcessID() == Kernel::KProcess::ProcessIDMin;
+    const auto process = SearchProcessList(process_list, [](const auto& proc) {
+        return proc->GetProcessID() == Kernel::KProcess::ProcessIDMin;
     });
 
     IPC::ResponseBuilder rb{ctx, 4};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.Push(process.has_value() ? (*process)->GetProcessID() : NO_PROCESS_FOUND_PID);
 }
 
@@ -57,7 +57,7 @@ private:
         LOG_DEBUG(Service_PM, "called");
 
         IPC::ResponseBuilder rb{ctx, 3};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.PushEnum(boot_mode);
     }
 
@@ -67,7 +67,7 @@ private:
         boot_mode = SystemBootMode::Maintenance;
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     SystemBootMode boot_mode = SystemBootMode::Normal;
@@ -100,8 +100,8 @@ private:
         LOG_DEBUG(Service_PM, "called, title_id={:016X}", title_id);
 
         const auto process =
-            SearchProcessList(kernel.GetProcessList(), [title_id](const auto& process) {
-                return process->GetTitleID() == title_id;
+            SearchProcessList(kernel.GetProcessList(), [title_id](const auto& proc) {
+                return proc->GetTitleID() == title_id;
             });
 
         if (!process.has_value()) {
@@ -111,7 +111,7 @@ private:
         }
 
         IPC::ResponseBuilder rb{ctx, 4};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push((*process)->GetProcessID());
     }
 
@@ -140,8 +140,8 @@ private:
 
         LOG_DEBUG(Service_PM, "called, process_id={:016X}", process_id);
 
-        const auto process = SearchProcessList(process_list, [process_id](const auto& process) {
-            return process->GetProcessID() == process_id;
+        const auto process = SearchProcessList(process_list, [process_id](const auto& proc) {
+            return proc->GetProcessID() == process_id;
         });
 
         if (!process.has_value()) {
@@ -151,7 +151,7 @@ private:
         }
 
         IPC::ResponseBuilder rb{ctx, 4};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push((*process)->GetTitleID());
     }
 

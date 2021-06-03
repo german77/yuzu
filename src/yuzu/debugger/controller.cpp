@@ -48,6 +48,7 @@ void ControllerDialog::refreshConfiguration() {
     widget->SetControllerType(players[player].controller_type);
     ControllerCallback callback{[this](ControllerInput input) { InputController(input); }};
     widget->SetCallBack(callback);
+    widget->repaint();
 }
 
 QAction* ControllerDialog::toggleViewAction() {

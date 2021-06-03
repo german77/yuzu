@@ -68,9 +68,10 @@ static FileSys::VirtualFile VfsDirectoryCreateFileWrapper(const FileSys::Virtual
 #include <QtConcurrent/QtConcurrent>
 
 #include <fmt/format.h>
-#include "common/common_paths.h"
 #include "common/detached_tasks.h"
-#include "common/file_util.h"
+#include "common/fs/fs.h"
+#include "common/fs/fs_paths.h"
+#include "common/fs/path_util.h"
 #include "common/logging/backend.h"
 #include "common/logging/filter.h"
 #include "common/logging/log.h"
@@ -180,36 +181,25 @@ static void InitializeLogging() {
     log_filter.ParseFilterString(Settings::values.log_filter);
     Log::SetGlobalFilter(log_filter);
 
-    const std::string& log_dir = FS::GetUserPath(FS::UserPath::LogDir);
-    FS::CreateFullPath(log_dir);
-    Log::AddBackend(std::make_unique<Log::FileBackend>(log_dir + LOG_FILE));
+    const auto log_dir = FS::GetYuzuPath(FS::YuzuPath::LogDir);
+    void(FS::CreateDir(log_dir));
+    Log::AddBackend(std::make_unique<Log::FileBackend>(log_dir / LOG_FILE));
 #ifdef _WIN32
     Log::AddBackend(std::make_unique<Log::DebuggerBackend>());
 #endif
 }
 
 static void RemoveCachedContents() {
-    const auto offline_fonts = Common::FS::SanitizePath(
-        fmt::format("{}/fonts", Common::FS::GetUserPath(Common::FS::UserPath::CacheDir)),
-        Common::FS::DirectorySeparator::PlatformDefault);
+    const auto cache_dir = Common::FS::GetYuzuPath(Common::FS::YuzuPath::CacheDir);
+    const auto offline_fonts = cache_dir / "fonts";
+    const auto offline_manual = cache_dir / "offline_web_applet_manual";
+    const auto offline_legal_information = cache_dir / "offline_web_applet_legal_information";
+    const auto offline_system_data = cache_dir / "offline_web_applet_system_data";
 
-    const auto offline_manual = Common::FS::SanitizePath(
-        fmt::format("{}/offline_web_applet_manual",
-                    Common::FS::GetUserPath(Common::FS::UserPath::CacheDir)),
-        Common::FS::DirectorySeparator::PlatformDefault);
-    const auto offline_legal_information = Common::FS::SanitizePath(
-        fmt::format("{}/offline_web_applet_legal_information",
-                    Common::FS::GetUserPath(Common::FS::UserPath::CacheDir)),
-        Common::FS::DirectorySeparator::PlatformDefault);
-    const auto offline_system_data = Common::FS::SanitizePath(
-        fmt::format("{}/offline_web_applet_system_data",
-                    Common::FS::GetUserPath(Common::FS::UserPath::CacheDir)),
-        Common::FS::DirectorySeparator::PlatformDefault);
-
-    Common::FS::DeleteDirRecursively(offline_fonts);
-    Common::FS::DeleteDirRecursively(offline_manual);
-    Common::FS::DeleteDirRecursively(offline_legal_information);
-    Common::FS::DeleteDirRecursively(offline_system_data);
+    void(Common::FS::RemoveDirRecursively(offline_fonts));
+    void(Common::FS::RemoveDirRecursively(offline_manual));
+    void(Common::FS::RemoveDirRecursively(offline_legal_information));
+    void(Common::FS::RemoveDirRecursively(offline_system_data));
 }
 
 GMainWindow::GMainWindow()
@@ -244,14 +234,15 @@ GMainWindow::GMainWindow()
     ConnectMenuEvents();
     ConnectWidgetEvents();
 
+    const auto branch_name = std::string(Common::g_scm_branch);
+    const auto description = std::string(Common::g_scm_desc);
     const auto build_id = std::string(Common::g_build_id);
-    const auto fmt = std::string(Common::g_title_bar_format_idle);
-    const auto yuzu_build_version =
-        fmt::format(fmt.empty() ? "yuzu Development Build" : fmt, std::string{}, std::string{},
-                    std::string{}, std::string{}, std::string{}, build_id);
 
-    LOG_INFO(Frontend, "yuzu Version: {} | {}-{}", yuzu_build_version, Common::g_scm_branch,
-             Common::g_scm_desc);
+    const auto yuzu_build = fmt::format("yuzu Development Build | {}-{}", branch_name, description);
+    const auto override_build = fmt::format(std::string(Common::g_title_bar_format_idle), build_id);
+    const auto yuzu_build_version = override_build.empty() ? yuzu_build : override_build;
+
+    LOG_INFO(Frontend, "yuzu Version: {}", yuzu_build_version);
 #ifdef ARCHITECTURE_x86_64
     const auto& caps = Common::GetCPUCaps();
     std::string cpu_string = caps.cpu_string;
@@ -775,10 +766,22 @@ void GMainWindow::InitializeWidgets() {
     dock_status_button->setObjectName(QStringLiteral("TogglableStatusBarButton"));
     dock_status_button->setFocusPolicy(Qt::NoFocus);
     connect(dock_status_button, &QPushButton::clicked, [&] {
-        Settings::values.use_docked_mode.SetValue(!Settings::values.use_docked_mode.GetValue());
-        dock_status_button->setChecked(Settings::values.use_docked_mode.GetValue());
-        OnDockedModeChanged(!Settings::values.use_docked_mode.GetValue(),
-                            Settings::values.use_docked_mode.GetValue());
+        const bool is_docked = Settings::values.use_docked_mode.GetValue();
+        auto& controller_type = Settings::values.players.GetValue()[0].controller_type;
+
+        if (!is_docked && controller_type == Settings::ControllerType::Handheld) {
+            QMessageBox::warning(this, tr("Invalid config detected"),
+                                 tr("Handheld controller can't be used on docked mode. Pro "
+                                    "controller will be selected."));
+            controller_type = Settings::ControllerType::ProController;
+            ConfigureDialog configure_dialog(this, hotkey_registry, input_subsystem.get());
+            configure_dialog.ApplyConfiguration();
+            controller_dialog->refreshConfiguration();
+        }
+
+        Settings::values.use_docked_mode.SetValue(!is_docked);
+        dock_status_button->setChecked(!is_docked);
+        OnDockedModeChanged(is_docked, !is_docked);
     });
     dock_status_button->setText(tr("DOCK"));
     dock_status_button->setCheckable(true);
@@ -1353,7 +1356,11 @@ void GMainWindow::BootGame(const QString& filename, std::size_t program_index) {
 
     if (!(loader == nullptr || loader->ReadProgramId(title_id) != Loader::ResultStatus::Success)) {
         // Load per game settings
-        Config per_game_config(fmt::format("{:016X}", title_id), Config::ConfigType::PerGameConfig);
+        const auto file_path = std::filesystem::path{filename.toStdU16String()};
+        const auto config_file_name = title_id == 0
+                                          ? Common::FS::PathToUTF8String(file_path.filename())
+                                          : fmt::format("{:016X}", title_id);
+        Config per_game_config(config_file_name, Config::ConfigType::PerGameConfig);
     }
 
     ConfigureVibration::SetAllVibrationDevices();
@@ -1399,7 +1406,7 @@ void GMainWindow::BootGame(const QString& filename, std::size_t program_index) {
         game_list->hide();
         game_list_placeholder->hide();
     }
-    status_bar_update_timer.start(2000);
+    status_bar_update_timer.start(500);
     async_status_button->setDisabled(true);
     multicore_status_button->setDisabled(true);
     renderer_status_button->setDisabled(true);
@@ -1427,7 +1434,8 @@ void GMainWindow::BootGame(const QString& filename, std::size_t program_index) {
         title_name = metadata.first->GetApplicationName();
     }
     if (res != Loader::ResultStatus::Success || title_name.empty()) {
-        title_name = Common::FS::GetFilename(filename.toStdString());
+        title_name = Common::FS::PathToUTF8String(
+            std::filesystem::path{filename.toStdU16String()}.filename());
     }
     LOG_INFO(Frontend, "Booting game: {:016X} | {} | {}", title_id, title_name, title_version);
     UpdateWindowTitle(title_name, title_version);
@@ -1547,7 +1555,7 @@ void GMainWindow::OnGameListLoadFile(QString game_path) {
 
 void GMainWindow::OnGameListOpenFolder(u64 program_id, GameListOpenTarget target,
                                        const std::string& game_path) {
-    std::string path;
+    std::filesystem::path path;
     QString open_target;
     auto& system = Core::System::GetInstance();
 
@@ -1576,7 +1584,7 @@ void GMainWindow::OnGameListOpenFolder(u64 program_id, GameListOpenTarget target
     switch (target) {
     case GameListOpenTarget::SaveData: {
         open_target = tr("Save Data");
-        const std::string nand_dir = Common::FS::GetUserPath(Common::FS::UserPath::NANDDir);
+        const auto nand_dir = Common::FS::GetYuzuPath(Common::FS::YuzuPath::NANDDir);
 
         if (has_user_save) {
             // User save data
@@ -1601,34 +1609,38 @@ void GMainWindow::OnGameListOpenFolder(u64 program_id, GameListOpenTarget target
             Service::Account::ProfileManager manager;
             const auto user_id = manager.GetUser(static_cast<std::size_t>(index));
             ASSERT(user_id);
-            path = nand_dir + FileSys::SaveDataFactory::GetFullPath(
-                                  system, FileSys::SaveDataSpaceId::NandUser,
-                                  FileSys::SaveDataType::SaveData, program_id, user_id->uuid, 0);
+
+            const auto user_save_data_path = FileSys::SaveDataFactory::GetFullPath(
+                system, FileSys::SaveDataSpaceId::NandUser, FileSys::SaveDataType::SaveData,
+                program_id, user_id->uuid, 0);
+
+            path = Common::FS::ConcatPathSafe(nand_dir, user_save_data_path);
         } else {
             // Device save data
-            path = nand_dir + FileSys::SaveDataFactory::GetFullPath(
-                                  system, FileSys::SaveDataSpaceId::NandUser,
-                                  FileSys::SaveDataType::SaveData, program_id, {}, 0);
+            const auto device_save_data_path = FileSys::SaveDataFactory::GetFullPath(
+                system, FileSys::SaveDataSpaceId::NandUser, FileSys::SaveDataType::SaveData,
+                program_id, {}, 0);
+
+            path = Common::FS::ConcatPathSafe(nand_dir, device_save_data_path);
         }
 
-        if (!Common::FS::Exists(path)) {
-            Common::FS::CreateFullPath(path);
-            Common::FS::CreateDir(path);
+        if (!Common::FS::CreateDirs(path)) {
+            LOG_ERROR(Frontend, "Unable to create the directories for save data");
         }
 
         break;
     }
     case GameListOpenTarget::ModData: {
         open_target = tr("Mod Data");
-        const auto load_dir = Common::FS::GetUserPath(Common::FS::UserPath::LoadDir);
-        path = fmt::format("{}{:016X}", load_dir, program_id);
+        path = Common::FS::GetYuzuPath(Common::FS::YuzuPath::LoadDir) /
+               fmt::format("{:016X}", program_id);
         break;
     }
     default:
         UNIMPLEMENTED();
     }
 
-    const QString qpath = QString::fromStdString(path);
+    const QString qpath = QString::fromStdString(Common::FS::PathToUTF8String(path));
     const QDir dir(qpath);
     if (!dir.exists()) {
         QMessageBox::warning(this, tr("Error Opening %1 Folder").arg(open_target),
@@ -1641,19 +1653,21 @@ void GMainWindow::OnGameListOpenFolder(u64 program_id, GameListOpenTarget target
 }
 
 void GMainWindow::OnTransferableShaderCacheOpenFile(u64 program_id) {
-    const QString shader_dir =
-        QString::fromStdString(Common::FS::GetUserPath(Common::FS::UserPath::ShaderDir));
-    const QString transferable_shader_cache_folder_path =
-        shader_dir + QStringLiteral("opengl") + QDir::separator() + QStringLiteral("transferable");
-    const QString transferable_shader_cache_file_path =
-        transferable_shader_cache_folder_path + QDir::separator() +
-        QString::fromStdString(fmt::format("{:016X}.bin", program_id));
+    const auto shader_cache_dir = Common::FS::GetYuzuPath(Common::FS::YuzuPath::ShaderDir);
+    const auto transferable_shader_cache_folder_path = shader_cache_dir / "opengl" / "transferable";
+    const auto transferable_shader_cache_file_path =
+        transferable_shader_cache_folder_path / fmt::format("{:016X}.bin", program_id);
 
-    if (!QFile::exists(transferable_shader_cache_file_path)) {
+    if (!Common::FS::Exists(transferable_shader_cache_file_path)) {
         QMessageBox::warning(this, tr("Error Opening Transferable Shader Cache"),
                              tr("A shader cache for this title does not exist."));
         return;
     }
+
+    const auto qt_shader_cache_folder_path =
+        QString::fromStdString(Common::FS::PathToUTF8String(transferable_shader_cache_folder_path));
+    const auto qt_shader_cache_file_path =
+        QString::fromStdString(Common::FS::PathToUTF8String(transferable_shader_cache_file_path));
 
     // Windows supports opening a folder with selecting a specified file in explorer. On every other
     // OS we just open the transferable shader cache folder without preselecting the transferable
@@ -1661,13 +1675,13 @@ void GMainWindow::OnTransferableShaderCacheOpenFile(u64 program_id) {
 #if defined(Q_OS_WIN)
     const QString explorer = QStringLiteral("explorer");
     QStringList param;
-    if (!QFileInfo(transferable_shader_cache_file_path).isDir()) {
+    if (!QFileInfo(qt_shader_cache_file_path).isDir()) {
         param << QStringLiteral("/select,");
     }
-    param << QDir::toNativeSeparators(transferable_shader_cache_file_path);
+    param << QDir::toNativeSeparators(qt_shader_cache_file_path);
     QProcess::startDetached(explorer, param);
 #else
-    QDesktopServices::openUrl(QUrl::fromLocalFile(transferable_shader_cache_folder_path));
+    QDesktopServices::openUrl(QUrl::fromLocalFile(qt_shader_cache_folder_path));
 #endif
 }
 
@@ -1745,8 +1759,8 @@ void GMainWindow::OnGameListRemoveInstalledEntry(u64 program_id, InstalledEntryT
         RemoveAddOnContent(program_id, entry_type);
         break;
     }
-    Common::FS::DeleteDirRecursively(Common::FS::GetUserPath(Common::FS::UserPath::CacheDir) +
-                                     DIR_SEP + "game_list");
+    void(Common::FS::RemoveDirRecursively(Common::FS::GetYuzuPath(Common::FS::YuzuPath::CacheDir) /
+                                          "game_list"));
     game_list->PopulateAsync(UISettings::values.game_dirs);
 }
 
@@ -1807,7 +1821,8 @@ void GMainWindow::RemoveAddOnContent(u64 program_id, const QString& entry_type) 
                              tr("Successfully removed %1 installed DLC.").arg(count));
 }
 
-void GMainWindow::OnGameListRemoveFile(u64 program_id, GameListRemoveTarget target) {
+void GMainWindow::OnGameListRemoveFile(u64 program_id, GameListRemoveTarget target,
+                                       const std::string& game_path) {
     const QString question = [this, target] {
         switch (target) {
         case GameListRemoveTarget::ShaderCache:
@@ -1829,27 +1844,23 @@ void GMainWindow::OnGameListRemoveFile(u64 program_id, GameListRemoveTarget targ
         RemoveTransferableShaderCache(program_id);
         break;
     case GameListRemoveTarget::CustomConfiguration:
-        RemoveCustomConfiguration(program_id);
+        RemoveCustomConfiguration(program_id, game_path);
         break;
     }
 }
 
 void GMainWindow::RemoveTransferableShaderCache(u64 program_id) {
-    const QString shader_dir =
-        QString::fromStdString(Common::FS::GetUserPath(Common::FS::UserPath::ShaderDir));
-    const QString transferable_shader_cache_folder_path =
-        shader_dir + QStringLiteral("opengl") + QDir::separator() + QStringLiteral("transferable");
-    const QString transferable_shader_cache_file_path =
-        transferable_shader_cache_folder_path + QDir::separator() +
-        QString::fromStdString(fmt::format("{:016X}.bin", program_id));
+    const auto shader_cache_dir = Common::FS::GetYuzuPath(Common::FS::YuzuPath::ShaderDir);
+    const auto transferable_shader_cache_file_path =
+        shader_cache_dir / "opengl" / "transferable" / fmt::format("{:016X}.bin", program_id);
 
-    if (!QFile::exists(transferable_shader_cache_file_path)) {
+    if (!Common::FS::Exists(transferable_shader_cache_file_path)) {
         QMessageBox::warning(this, tr("Error Removing Transferable Shader Cache"),
                              tr("A shader cache for this title does not exist."));
         return;
     }
 
-    if (QFile::remove(transferable_shader_cache_file_path)) {
+    if (Common::FS::RemoveFile(transferable_shader_cache_file_path)) {
         QMessageBox::information(this, tr("Successfully Removed"),
                                  tr("Successfully removed the transferable shader cache."));
     } else {
@@ -1858,20 +1869,21 @@ void GMainWindow::RemoveTransferableShaderCache(u64 program_id) {
     }
 }
 
-void GMainWindow::RemoveCustomConfiguration(u64 program_id) {
-    const QString config_dir =
-        QString::fromStdString(Common::FS::GetUserPath(Common::FS::UserPath::ConfigDir));
-    const QString custom_config_file_path =
-        config_dir + QStringLiteral("custom") + QDir::separator() +
-        QString::fromStdString(fmt::format("{:016X}.ini", program_id));
+void GMainWindow::RemoveCustomConfiguration(u64 program_id, const std::string& game_path) {
+    const auto file_path = std::filesystem::path(Common::FS::ToU8String(game_path));
+    const auto config_file_name =
+        program_id == 0 ? Common::FS::PathToUTF8String(file_path.filename()).append(".ini")
+                        : fmt::format("{:016X}.ini", program_id);
+    const auto custom_config_file_path =
+        Common::FS::GetYuzuPath(Common::FS::YuzuPath::ConfigDir) / "custom" / config_file_name;
 
-    if (!QFile::exists(custom_config_file_path)) {
+    if (!Common::FS::Exists(custom_config_file_path)) {
         QMessageBox::warning(this, tr("Error Removing Custom Configuration"),
                              tr("A custom configuration for this title does not exist."));
         return;
     }
 
-    if (QFile::remove(custom_config_file_path)) {
+    if (Common::FS::RemoveFile(custom_config_file_path)) {
         QMessageBox::information(this, tr("Successfully Removed"),
                                  tr("Successfully removed the custom game configuration."));
     } else {
@@ -1908,8 +1920,10 @@ void GMainWindow::OnGameListDumpRomFS(u64 program_id, const std::string& game_pa
         return;
     }
 
-    const auto path = fmt::format(
-        "{}{:016X}/romfs", Common::FS::GetUserPath(Common::FS::UserPath::DumpDir), *romfs_title_id);
+    const auto dump_dir = Common::FS::GetYuzuPath(Common::FS::YuzuPath::DumpDir);
+    const auto romfs_dir = fmt::format("{:016X}/romfs", *romfs_title_id);
+
+    const auto path = Common::FS::PathToUTF8String(dump_dir / romfs_dir);
 
     FileSys::VirtualFile romfs;
 
@@ -1987,24 +2001,29 @@ void GMainWindow::OnGameListNavigateToGamedbEntry(u64 program_id,
 }
 
 void GMainWindow::OnGameListOpenDirectory(const QString& directory) {
-    QString path;
+    std::filesystem::path fs_path;
     if (directory == QStringLiteral("SDMC")) {
-        path = QString::fromStdString(Common::FS::GetUserPath(Common::FS::UserPath::SDMCDir) +
-                                      "Nintendo/Contents/registered");
+        fs_path =
+            Common::FS::GetYuzuPath(Common::FS::YuzuPath::SDMCDir) / "Nintendo/Contents/registered";
     } else if (directory == QStringLiteral("UserNAND")) {
-        path = QString::fromStdString(Common::FS::GetUserPath(Common::FS::UserPath::NANDDir) +
-                                      "user/Contents/registered");
+        fs_path =
+            Common::FS::GetYuzuPath(Common::FS::YuzuPath::NANDDir) / "user/Contents/registered";
     } else if (directory == QStringLiteral("SysNAND")) {
-        path = QString::fromStdString(Common::FS::GetUserPath(Common::FS::UserPath::NANDDir) +
-                                      "system/Contents/registered");
+        fs_path =
+            Common::FS::GetYuzuPath(Common::FS::YuzuPath::NANDDir) / "system/Contents/registered";
     } else {
-        path = directory;
+        fs_path = directory.toStdString();
     }
-    if (!QFileInfo::exists(path)) {
-        QMessageBox::critical(this, tr("Error Opening %1").arg(path), tr("Folder does not exist!"));
+
+    const auto qt_path = QString::fromStdString(Common::FS::PathToUTF8String(fs_path));
+
+    if (!Common::FS::IsDir(fs_path)) {
+        QMessageBox::critical(this, tr("Error Opening %1").arg(qt_path),
+                              tr("Folder does not exist!"));
         return;
     }
-    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+
+    QDesktopServices::openUrl(QUrl::fromLocalFile(qt_path));
 }
 
 void GMainWindow::OnGameListAddDirectory() {
@@ -2123,6 +2142,7 @@ void GMainWindow::OnMenuInstallToNAND() {
     QStringList new_files{};         // Newly installed files that do not yet exist in the NAND
     QStringList overwritten_files{}; // Files that overwrote those existing in the NAND
     QStringList failed_files{};      // Files that failed to install due to errors
+    bool detected_base_install{};    // Whether a base game was attempted to be installed
 
     ui.action_Install_File_NAND->setEnabled(false);
 
@@ -2148,6 +2168,7 @@ void GMainWindow::OnMenuInstallToNAND() {
 
             while (!future.isFinished()) {
                 QCoreApplication::processEvents();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
 
             result = future.result();
@@ -2168,12 +2189,23 @@ void GMainWindow::OnMenuInstallToNAND() {
         case InstallResult::Failure:
             failed_files.append(QFileInfo(file).fileName());
             break;
+        case InstallResult::BaseInstallAttempted:
+            failed_files.append(QFileInfo(file).fileName());
+            detected_base_install = true;
+            break;
         }
 
         --remaining;
     }
 
     install_progress->close();
+
+    if (detected_base_install) {
+        QMessageBox::warning(
+            this, tr("Install Results"),
+            tr("To avoid possible conflicts, we discourage users from installing base games to the "
+               "NAND.\nPlease, only use this feature to install updates and DLC."));
+    }
 
     const QString install_results =
         (new_files.isEmpty() ? QString{}
@@ -2185,8 +2217,8 @@ void GMainWindow::OnMenuInstallToNAND() {
                                 : tr("%n file(s) failed to install\n", "", failed_files.size()));
 
     QMessageBox::information(this, tr("Install Results"), install_results);
-    Common::FS::DeleteDirRecursively(Common::FS::GetUserPath(Common::FS::UserPath::CacheDir) +
-                                     DIR_SEP + "game_list");
+    void(Common::FS::RemoveDirRecursively(Common::FS::GetYuzuPath(Common::FS::YuzuPath::CacheDir) /
+                                          "game_list"));
     game_list->PopulateAsync(UISettings::values.game_dirs);
     ui.action_Install_File_NAND->setEnabled(true);
 }
@@ -2236,11 +2268,14 @@ InstallResult GMainWindow::InstallNSPXCI(const QString& filename) {
     const auto res =
         Core::System::GetInstance().GetFileSystemController().GetUserNANDContents()->InstallEntry(
             *nsp, true, qt_raw_copy);
-    if (res == FileSys::InstallResult::Success) {
+    switch (res) {
+    case FileSys::InstallResult::Success:
         return InstallResult::Success;
-    } else if (res == FileSys::InstallResult::OverwriteExisting) {
+    case FileSys::InstallResult::OverwriteExisting:
         return InstallResult::Overwrite;
-    } else {
+    case FileSys::InstallResult::ErrorBaseInstall:
+        return InstallResult::BaseInstallAttempted;
+    default:
         return InstallResult::Failure;
     }
 }
@@ -2583,12 +2618,12 @@ void GMainWindow::OnConfigure() {
             &GMainWindow::OnLanguageChanged);
 
     const auto result = configure_dialog.exec();
-    if (result != QDialog::Accepted) {
+    if (result != QDialog::Accepted && !UISettings::values.configuration_applied) {
         return;
+    } else if (result == QDialog::Accepted) {
+        configure_dialog.ApplyConfiguration();
+        controller_dialog->refreshConfiguration();
     }
-
-    configure_dialog.ApplyConfiguration();
-    controller_dialog->refreshConfiguration();
     InitializeHotkeys();
     if (UISettings::values.theme != old_theme) {
         UpdateUITheme();
@@ -2602,6 +2637,8 @@ void GMainWindow::OnConfigure() {
     if (reload) {
         game_list->PopulateAsync(UISettings::values.game_dirs);
     }
+
+    UISettings::values.configuration_applied = false;
 
     config->Save();
 
@@ -2629,26 +2666,30 @@ void GMainWindow::OpenPerGameConfiguration(u64 title_id, const std::string& file
     const auto v_file = Core::GetGameFileFromPath(vfs, file_name);
     const auto& system = Core::System::GetInstance();
 
-    ConfigurePerGame dialog(this, title_id);
+    ConfigurePerGame dialog(this, title_id, file_name);
     dialog.LoadFromFile(v_file);
     const auto result = dialog.exec();
-    if (result == QDialog::Accepted) {
-        dialog.ApplyConfiguration();
 
-        const auto reload = UISettings::values.is_game_list_reload_pending.exchange(false);
-        if (reload) {
-            game_list->PopulateAsync(UISettings::values.game_dirs);
-        }
-
-        // Do not cause the global config to write local settings into the config file
-        const bool is_powered_on = system.IsPoweredOn();
-        Settings::RestoreGlobalState(is_powered_on);
-
-        if (!is_powered_on) {
-            config->Save();
-        }
-    } else {
+    if (result != QDialog::Accepted && !UISettings::values.configuration_applied) {
         Settings::RestoreGlobalState(system.IsPoweredOn());
+        return;
+    } else if (result == QDialog::Accepted) {
+        dialog.ApplyConfiguration();
+    }
+
+    const auto reload = UISettings::values.is_game_list_reload_pending.exchange(false);
+    if (reload) {
+        game_list->PopulateAsync(UISettings::values.game_dirs);
+    }
+
+    // Do not cause the global config to write local settings into the config file
+    const bool is_powered_on = system.IsPoweredOn();
+    Settings::RestoreGlobalState(is_powered_on);
+
+    UISettings::values.configuration_applied = false;
+
+    if (!is_powered_on) {
+        config->Save();
     }
 }
 
@@ -2699,7 +2740,7 @@ void GMainWindow::LoadAmiibo(const QString& filename) {
 
 void GMainWindow::OnOpenYuzuFolder() {
     QDesktopServices::openUrl(QUrl::fromLocalFile(
-        QString::fromStdString(Common::FS::GetUserPath(Common::FS::UserPath::UserDir))));
+        QString::fromStdString(Common::FS::GetYuzuPathString(Common::FS::YuzuPath::YuzuDir))));
 }
 
 void GMainWindow::OnAbout() {
@@ -2721,7 +2762,7 @@ void GMainWindow::OnCaptureScreenshot() {
 
     const u64 title_id = Core::System::GetInstance().CurrentProcess()->GetTitleID();
     const auto screenshot_path =
-        QString::fromStdString(Common::FS::GetUserPath(Common::FS::UserPath::ScreenshotsDir));
+        QString::fromStdString(Common::FS::GetYuzuPathString(Common::FS::YuzuPath::ScreenshotsDir));
     const auto date =
         QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd_hh-mm-ss-zzz"));
     QString filename = QStringLiteral("%1%2_%3.png")
@@ -2750,47 +2791,45 @@ void GMainWindow::OnCaptureScreenshot() {
 
 // TODO: Written 2020-10-01: Remove per-game config migration code when it is irrelevant
 void GMainWindow::MigrateConfigFiles() {
-    const std::string& config_dir_str = Common::FS::GetUserPath(Common::FS::UserPath::ConfigDir);
-    const QDir config_dir = QDir(QString::fromStdString(config_dir_str));
+    const auto config_dir_fs_path = Common::FS::GetYuzuPath(Common::FS::YuzuPath::ConfigDir);
+    const QDir config_dir =
+        QDir(QString::fromStdString(Common::FS::PathToUTF8String(config_dir_fs_path)));
     const QStringList config_dir_list = config_dir.entryList(QStringList(QStringLiteral("*.ini")));
 
-    Common::FS::CreateFullPath(fmt::format("{}custom" DIR_SEP, config_dir_str));
-    for (QStringList::const_iterator it = config_dir_list.constBegin();
-         it != config_dir_list.constEnd(); ++it) {
+    if (!Common::FS::CreateDirs(config_dir_fs_path / "custom")) {
+        LOG_ERROR(Frontend, "Failed to create new config file directory");
+    }
+
+    for (auto it = config_dir_list.constBegin(); it != config_dir_list.constEnd(); ++it) {
         const auto filename = it->toStdString();
         if (filename.find_first_not_of("0123456789abcdefACBDEF", 0) < 16) {
             continue;
         }
-        const auto origin = fmt::format("{}{}", config_dir_str, filename);
-        const auto destination = fmt::format("{}custom" DIR_SEP "{}", config_dir_str, filename);
+        const auto origin = config_dir_fs_path / filename;
+        const auto destination = config_dir_fs_path / "custom" / filename;
         LOG_INFO(Frontend, "Migrating config file from {} to {}", origin, destination);
-        if (!Common::FS::Rename(origin, destination)) {
+        if (!Common::FS::RenameFile(origin, destination)) {
             // Delete the old config file if one already exists in the new location.
-            Common::FS::Delete(origin);
+            void(Common::FS::RemoveFile(origin));
         }
     }
 }
 
 void GMainWindow::UpdateWindowTitle(const std::string& title_name,
                                     const std::string& title_version) {
-    const auto full_name = std::string(Common::g_build_fullname);
     const auto branch_name = std::string(Common::g_scm_branch);
     const auto description = std::string(Common::g_scm_desc);
     const auto build_id = std::string(Common::g_build_id);
 
-    const auto date =
-        QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd")).toStdString();
+    const auto yuzu_title = fmt::format("yuzu | {}-{}", branch_name, description);
+    const auto override_title = fmt::format(std::string(Common::g_title_bar_format_idle), build_id);
+    const auto window_title = override_title.empty() ? yuzu_title : override_title;
 
     if (title_name.empty()) {
-        const auto fmt = std::string(Common::g_title_bar_format_idle);
-        setWindowTitle(QString::fromStdString(fmt::format(fmt.empty() ? "yuzu {0}| {1}-{2}" : fmt,
-                                                          full_name, branch_name, description,
-                                                          std::string{}, date, build_id)));
+        setWindowTitle(QString::fromStdString(window_title));
     } else {
-        const auto fmt = std::string(Common::g_title_bar_format_running);
-        setWindowTitle(QString::fromStdString(
-            fmt::format(fmt.empty() ? "yuzu {0}| {3} | {6} | {1}-{2}" : fmt, full_name, branch_name,
-                        description, title_name, date, build_id, title_version)));
+        const auto run_title = fmt::format("{} | {} | {}", window_title, title_name, title_version);
+        setWindowTitle(QString::fromStdString(run_title));
     }
 }
 
@@ -2821,7 +2860,7 @@ void GMainWindow::UpdateStatusBar() {
     } else {
         emu_speed_label->setText(tr("Speed: %1%").arg(results.emulation_speed * 100.0, 0, 'f', 0));
     }
-    game_fps_label->setText(tr("Game: %1 FPS").arg(results.game_fps, 0, 'f', 0));
+    game_fps_label->setText(tr("Game: %1 FPS").arg(results.average_game_fps, 0, 'f', 0));
     emu_frametime_label->setText(tr("Frame: %1 ms").arg(results.frametime * 1000.0, 0, 'f', 2));
 
     emu_speed_label->setVisible(!Settings::values.use_multi_core.GetValue());
@@ -2965,18 +3004,16 @@ void GMainWindow::OnReinitializeKeys(ReinitializeKeyBehavior behavior) {
         if (res == QMessageBox::Cancel)
             return;
 
-        Common::FS::Delete(Common::FS::GetUserPath(Common::FS::UserPath::KeysDir) +
-                           "prod.keys_autogenerated");
-        Common::FS::Delete(Common::FS::GetUserPath(Common::FS::UserPath::KeysDir) +
-                           "console.keys_autogenerated");
-        Common::FS::Delete(Common::FS::GetUserPath(Common::FS::UserPath::KeysDir) +
-                           "title.keys_autogenerated");
+        const auto keys_dir = Common::FS::GetYuzuPath(Common::FS::YuzuPath::KeysDir);
+
+        void(Common::FS::RemoveFile(keys_dir / "prod.keys_autogenerated"));
+        void(Common::FS::RemoveFile(keys_dir / "console.keys_autogenerated"));
+        void(Common::FS::RemoveFile(keys_dir / "title.keys_autogenerated"));
     }
 
     Core::Crypto::KeyManager& keys = Core::Crypto::KeyManager::Instance();
     if (keys.BaseDeriveNecessary()) {
-        Core::Crypto::PartitionDataManager pdm{vfs->OpenDirectory(
-            Common::FS::GetUserPath(Common::FS::UserPath::SysDataDir), FileSys::Mode::Read)};
+        Core::Crypto::PartitionDataManager pdm{vfs->OpenDirectory("", FileSys::Mode::Read)};
 
         const auto function = [this, &keys, &pdm] {
             keys.PopulateFromPartitionData(pdm);
@@ -3289,12 +3326,17 @@ int main(int argc, char* argv[]) {
     QCoreApplication::setOrganizationName(QStringLiteral("yuzu team"));
     QCoreApplication::setApplicationName(QStringLiteral("yuzu"));
 
+#ifdef _WIN32
+    // Increases the maximum open file limit to 4096
+    _setmaxstdio(4096);
+#endif
+
 #ifdef __APPLE__
     // If you start a bundle (binary) on OSX without the Terminal, the working directory is "/".
     // But since we require the working directory to be the executable path for the location of
     // the user folder in the Qt Frontend, we need to cd into that working directory
-    const std::string bin_path = Common::FS::GetBundleDirectory() + DIR_SEP + "..";
-    chdir(bin_path.c_str());
+    const auto bin_path = Common::FS::GetBundleDirectory() / "..";
+    chdir(Common::FS::PathToUTF8String(bin_path).c_str());
 #endif
 
 #ifdef __linux__

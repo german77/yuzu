@@ -11,37 +11,35 @@
 namespace Service::Time::Clock {
 
 StandardUserSystemClockCore::StandardUserSystemClockCore(
-    StandardLocalSystemClockCore& local_system_clock_core,
-    StandardNetworkSystemClockCore& network_system_clock_core, Core::System& system)
-    : SystemClockCore(local_system_clock_core.GetSteadyClockCore()),
-      local_system_clock_core{local_system_clock_core},
-      network_system_clock_core{network_system_clock_core}, auto_correction_enabled{},
+    StandardLocalSystemClockCore& local_system_clock_core_,
+    StandardNetworkSystemClockCore& network_system_clock_core_, Core::System& system_)
+    : SystemClockCore(local_system_clock_core_.GetSteadyClockCore()),
+      local_system_clock_core{local_system_clock_core_},
+      network_system_clock_core{network_system_clock_core_},
       auto_correction_time{SteadyClockTimePoint::GetRandom()}, auto_correction_event{
-                                                                   system.Kernel()} {
+                                                                   system_.Kernel()} {
     Kernel::KAutoObject::Create(std::addressof(auto_correction_event));
     auto_correction_event.Initialize("StandardUserSystemClockCore:AutoCorrectionEvent");
 }
 
 ResultCode StandardUserSystemClockCore::SetAutomaticCorrectionEnabled(Core::System& system,
                                                                       bool value) {
-    if (const ResultCode result{ApplyAutomaticCorrection(system, value)};
-        result != RESULT_SUCCESS) {
+    if (const ResultCode result{ApplyAutomaticCorrection(system, value)}; result != ResultSuccess) {
         return result;
     }
 
     auto_correction_enabled = value;
 
-    return RESULT_SUCCESS;
+    return ResultSuccess;
 }
 
 ResultCode StandardUserSystemClockCore::GetClockContext(Core::System& system,
-                                                        SystemClockContext& context) const {
-    if (const ResultCode result{ApplyAutomaticCorrection(system, false)};
-        result != RESULT_SUCCESS) {
+                                                        SystemClockContext& ctx) const {
+    if (const ResultCode result{ApplyAutomaticCorrection(system, false)}; result != ResultSuccess) {
         return result;
     }
 
-    return local_system_clock_core.GetClockContext(system, context);
+    return local_system_clock_core.GetClockContext(system, ctx);
 }
 
 ResultCode StandardUserSystemClockCore::Flush(const SystemClockContext&) {
@@ -57,22 +55,22 @@ ResultCode StandardUserSystemClockCore::SetClockContext(const SystemClockContext
 ResultCode StandardUserSystemClockCore::ApplyAutomaticCorrection(Core::System& system,
                                                                  bool value) const {
     if (auto_correction_enabled == value) {
-        return RESULT_SUCCESS;
+        return ResultSuccess;
     }
 
     if (!network_system_clock_core.IsClockSetup(system)) {
         return ERROR_UNINITIALIZED_CLOCK;
     }
 
-    SystemClockContext context{};
-    if (const ResultCode result{network_system_clock_core.GetClockContext(system, context)};
-        result != RESULT_SUCCESS) {
+    SystemClockContext ctx{};
+    if (const ResultCode result{network_system_clock_core.GetClockContext(system, ctx)};
+        result != ResultSuccess) {
         return result;
     }
 
-    local_system_clock_core.SetClockContext(context);
+    local_system_clock_core.SetClockContext(ctx);
 
-    return RESULT_SUCCESS;
+    return ResultSuccess;
 }
 
 } // namespace Service::Time::Clock

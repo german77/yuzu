@@ -11,7 +11,9 @@
 #include <thread>
 #include <fmt/chrono.h>
 #include <fmt/format.h>
-#include "common/file_util.h"
+#include "common/fs/file.h"
+#include "common/fs/fs.h"
+#include "common/fs/path_util.h"
 #include "common/math_util.h"
 #include "common/settings.h"
 #include "core/perf_stats.h"
@@ -27,7 +29,7 @@ constexpr std::size_t IgnoreFrames = 5;
 
 namespace Core {
 
-PerfStats::PerfStats(u64 title_id) : title_id(title_id) {}
+PerfStats::PerfStats(u64 title_id_) : title_id(title_id_) {}
 
 PerfStats::~PerfStats() {
     if (!Settings::values.record_frame_times || title_id == 0) {
@@ -38,12 +40,17 @@ PerfStats::~PerfStats() {
     std::ostringstream stream;
     std::copy(perf_history.begin() + IgnoreFrames, perf_history.begin() + current_index,
               std::ostream_iterator<double>(stream, "\n"));
-    const std::string& path = Common::FS::GetUserPath(Common::FS::UserPath::LogDir);
+
+    const auto path = Common::FS::GetYuzuPath(Common::FS::YuzuPath::LogDir);
     // %F Date format expanded is "%Y-%m-%d"
-    const std::string filename =
-        fmt::format("{}/{:%F-%H-%M}_{:016X}.csv", path, *std::localtime(&t), title_id);
-    Common::FS::IOFile file(filename, "w");
-    file.WriteString(stream.str());
+    const auto filename = fmt::format("{:%F-%H-%M}_{:016X}.csv", *std::localtime(&t), title_id);
+    const auto filepath = path / filename;
+
+    if (Common::FS::CreateParentDir(filepath)) {
+        Common::FS::IOFile file(filepath, Common::FS::FileAccessMode::Write,
+                                Common::FS::FileType::TextFile);
+        void(file.WriteString(stream.str()));
+    }
 }
 
 void PerfStats::BeginSystemFrame() {
@@ -69,9 +76,7 @@ void PerfStats::EndSystemFrame() {
 }
 
 void PerfStats::EndGameFrame() {
-    std::lock_guard lock{object_mutex};
-
-    game_frames += 1;
+    game_frames.fetch_add(1, std::memory_order_relaxed);
 }
 
 double PerfStats::GetMeanFrametime() const {
@@ -94,10 +99,11 @@ PerfStatsResults PerfStats::GetAndResetStats(microseconds current_system_time_us
     const auto interval = duration_cast<DoubleSecs>(now - reset_point).count();
 
     const auto system_us_per_second = (current_system_time_us - reset_point_system_us) / interval;
-
+    const auto current_frames = static_cast<double>(game_frames.load(std::memory_order_relaxed));
+    const auto current_fps = current_frames / interval;
     const PerfStatsResults results{
         .system_fps = static_cast<double>(system_frames) / interval,
-        .game_fps = static_cast<double>(game_frames) / interval,
+        .average_game_fps = (current_fps + previous_fps) / 2.0,
         .frametime = duration_cast<DoubleSecs>(accumulated_frametime).count() /
                      static_cast<double>(system_frames),
         .emulation_speed = system_us_per_second.count() / 1'000'000.0,
@@ -108,7 +114,8 @@ PerfStatsResults PerfStats::GetAndResetStats(microseconds current_system_time_us
     reset_point_system_us = current_system_time_us;
     accumulated_frametime = Clock::duration::zero();
     system_frames = 0;
-    game_frames = 0;
+    game_frames.store(0, std::memory_order_relaxed);
+    previous_fps = current_fps;
 
     return results;
 }

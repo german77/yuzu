@@ -7,9 +7,9 @@
 #include <memory>
 #include <unordered_map>
 
-#include <dynarmic/A32/a32.h>
-#include <dynarmic/A64/a64.h>
-#include <dynarmic/exclusive_monitor.h>
+#include <dynarmic/interface/A32/a32.h>
+#include <dynarmic/interface/A64/a64.h>
+#include <dynarmic/interface/exclusive_monitor.h>
 #include "common/common_types.h"
 #include "common/hash.h"
 #include "core/arm/arm_interface.h"
@@ -42,13 +42,11 @@ public:
     u32 GetPSTATE() const override;
     void SetPSTATE(u32 pstate) override;
     void Run() override;
-    void ExceptionalExit() override;
     void Step() override;
     VAddr GetTlsAddress() const override;
     void SetTlsAddress(VAddr address) override;
     void SetTPIDR_EL0(u64 value) override;
     u64 GetTPIDR_EL0() const override;
-    void ChangeProcessorID(std::size_t new_core_id) override;
 
     bool IsInThumbMode() const {
         return (GetPSTATE() & 0x20) != 0;
@@ -83,6 +81,12 @@ private:
     std::size_t core_index;
     DynarmicExclusiveMonitor& exclusive_monitor;
     std::shared_ptr<Dynarmic::A32::Jit> jit;
+
+    // SVC callback
+    u32 svc_swi{};
+    bool svc_called{};
+
+    bool shutdown{};
 };
 
 } // namespace Core

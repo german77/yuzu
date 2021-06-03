@@ -7,7 +7,7 @@
 #include <ostream>
 #include <string>
 #include "common/concepts.h"
-#include "common/file_util.h"
+#include "common/fs/path_util.h"
 #include "common/logging/log.h"
 #include "common/string_util.h"
 #include "core/core.h"
@@ -194,7 +194,7 @@ std::ostream& operator<<(std::ostream& os, ResultStatus status) {
     return os;
 }
 
-AppLoader::AppLoader(FileSys::VirtualFile file) : file(std::move(file)) {}
+AppLoader::AppLoader(FileSys::VirtualFile file_) : file(std::move(file_)) {}
 AppLoader::~AppLoader() = default;
 
 /**

@@ -3,19 +3,26 @@
 // Refer to the license.txt file included.
 
 #include <algorithm>
+#include <filesystem>
 #include <memory>
+#include <string>
 #include <utility>
 
+#include <fmt/format.h>
+
+#include <QAbstractButton>
 #include <QCheckBox>
+#include <QDialogButtonBox>
 #include <QHeaderView>
 #include <QMenu>
+#include <QPushButton>
 #include <QStandardItemModel>
 #include <QString>
 #include <QTimer>
 #include <QTreeView>
 
-#include "common/common_paths.h"
-#include "common/file_util.h"
+#include "common/fs/fs_util.h"
+#include "common/fs/path_util.h"
 #include "core/core.h"
 #include "core/file_sys/control_metadata.h"
 #include "core/file_sys/patch_manager.h"
@@ -28,10 +35,12 @@
 #include "yuzu/uisettings.h"
 #include "yuzu/util/util.h"
 
-ConfigurePerGame::ConfigurePerGame(QWidget* parent, u64 title_id)
+ConfigurePerGame::ConfigurePerGame(QWidget* parent, u64 title_id, const std::string& file_name)
     : QDialog(parent), ui(std::make_unique<Ui::ConfigurePerGame>()), title_id(title_id) {
-    game_config = std::make_unique<Config>(fmt::format("{:016X}", title_id),
-                                           Config::ConfigType::PerGameConfig);
+    const auto file_path = std::filesystem::path(Common::FS::ToU8String(file_name));
+    const auto config_file_name = title_id == 0 ? Common::FS::PathToUTF8String(file_path.filename())
+                                                : fmt::format("{:016X}", title_id);
+    game_config = std::make_unique<Config>(config_file_name, Config::ConfigType::PerGameConfig);
 
     Settings::SetConfiguringGlobal(false);
 
@@ -44,6 +53,12 @@ ConfigurePerGame::ConfigurePerGame(QWidget* parent, u64 title_id)
     scene = new QGraphicsScene;
     ui->icon_view->setScene(scene);
 
+    if (Core::System::GetInstance().IsPoweredOn()) {
+        QPushButton* apply_button = ui->buttonBox->addButton(QDialogButtonBox::Apply);
+        connect(apply_button, &QAbstractButton::clicked, this,
+                &ConfigurePerGame::HandleApplyButtonClicked);
+    }
+
     LoadConfiguration();
 }
 
@@ -52,6 +67,7 @@ ConfigurePerGame::~ConfigurePerGame() = default;
 void ConfigurePerGame::ApplyConfiguration() {
     ui->addonsTab->ApplyConfiguration();
     ui->generalTab->ApplyConfiguration();
+    ui->cpuTab->ApplyConfiguration();
     ui->systemTab->ApplyConfiguration();
     ui->graphicsTab->ApplyConfiguration();
     ui->graphicsAdvancedTab->ApplyConfiguration();
@@ -73,6 +89,11 @@ void ConfigurePerGame::changeEvent(QEvent* event) {
 
 void ConfigurePerGame::RetranslateUI() {
     ui->retranslateUi(this);
+}
+
+void ConfigurePerGame::HandleApplyButtonClicked() {
+    UISettings::values.configuration_applied = true;
+    ApplyConfiguration();
 }
 
 void ConfigurePerGame::LoadFromFile(FileSys::VirtualFile file) {

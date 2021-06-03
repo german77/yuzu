@@ -50,8 +50,8 @@ public:
         Enabled,
     };
 
-    explicit OpusDecoderState(OpusDecoderPtr decoder, u32 sample_rate, u32 channel_count)
-        : decoder{std::move(decoder)}, sample_rate{sample_rate}, channel_count{channel_count} {}
+    explicit OpusDecoderState(OpusDecoderPtr decoder_, u32 sample_rate_, u32 channel_count_)
+        : decoder{std::move(decoder_)}, sample_rate{sample_rate_}, channel_count{channel_count_} {}
 
     // Decodes interleaved Opus packets. Optionally allows reporting time taken to
     // perform the decoding, as well as any relevant extra behavior.
@@ -80,13 +80,13 @@ private:
             LOG_ERROR(Audio, "Failed to decode opus data");
             IPC::ResponseBuilder rb{ctx, 2};
             // TODO(ogniK): Use correct error code
-            rb.Push(RESULT_UNKNOWN);
+            rb.Push(ResultUnknown);
             return;
         }
 
         const u32 param_size = performance != nullptr ? 6 : 4;
         IPC::ResponseBuilder rb{ctx, param_size};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push<u32>(consumed);
         rb.Push<u32>(sample_count);
         if (performance) {
@@ -160,9 +160,9 @@ private:
 
 class IHardwareOpusDecoderManager final : public ServiceFramework<IHardwareOpusDecoderManager> {
 public:
-    explicit IHardwareOpusDecoderManager(Core::System& system_, OpusDecoderState decoder_state)
+    explicit IHardwareOpusDecoderManager(Core::System& system_, OpusDecoderState decoder_state_)
         : ServiceFramework{system_, "IHardwareOpusDecoderManager"}, decoder_state{
-                                                                        std::move(decoder_state)} {
+                                                                        std::move(decoder_state_)} {
         // clang-format off
         static const FunctionInfo functions[] = {
             {0, &IHardwareOpusDecoderManager::DecodeInterleavedOld, "DecodeInterleavedOld"},
@@ -249,7 +249,7 @@ void HwOpus::GetWorkBufferSize(Kernel::HLERequestContext& ctx) {
     LOG_DEBUG(Audio, "worker_buffer_sz={}", worker_buffer_sz);
 
     IPC::ResponseBuilder rb{ctx, 3};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.Push<u32>(worker_buffer_sz);
 }
 
@@ -281,12 +281,12 @@ void HwOpus::OpenOpusDecoder(Kernel::HLERequestContext& ctx) {
         LOG_ERROR(Audio, "Failed to create Opus decoder (error={}).", error);
         IPC::ResponseBuilder rb{ctx, 2};
         // TODO(ogniK): Use correct error code
-        rb.Push(RESULT_UNKNOWN);
+        rb.Push(ResultUnknown);
         return;
     }
 
     IPC::ResponseBuilder rb{ctx, 2, 0, 1};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.PushIpcInterface<IHardwareOpusDecoderManager>(
         system, OpusDecoderState{std::move(decoder), sample_rate, channel_count});
 }

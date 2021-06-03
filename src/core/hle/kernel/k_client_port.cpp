@@ -91,7 +91,7 @@ ResultCode KClientPort::CreateSession(KClientSession** out) {
     // Create a new session.
     KSession* session = KSession::Create(kernel);
     if (session == nullptr) {
-        /* Decrement the session count. */
+        // Decrement the session count.
         const auto prev = num_sessions--;
         if (prev == max_sessions) {
             this->NotifyAvailable();
@@ -119,7 +119,7 @@ ResultCode KClientPort::CreateSession(KClientSession** out) {
     // We succeeded, so set the output.
     session_guard.Cancel();
     *out = std::addressof(session->GetClientSession());
-    return RESULT_SUCCESS;
+    return ResultSuccess;
 }
 
 } // namespace Kernel

@@ -7,7 +7,7 @@
 #include <memory>
 #include <unordered_map>
 
-#include <dynarmic/exclusive_monitor.h>
+#include <dynarmic/interface/exclusive_monitor.h>
 
 #include "common/common_types.h"
 #include "core/arm/dynarmic/arm_dynarmic_32.h"
@@ -22,7 +22,7 @@ namespace Core {
 
 class DynarmicExclusiveMonitor final : public ExclusiveMonitor {
 public:
-    explicit DynarmicExclusiveMonitor(Memory::Memory& memory, std::size_t core_count);
+    explicit DynarmicExclusiveMonitor(Memory::Memory& memory_, std::size_t core_count_);
     ~DynarmicExclusiveMonitor() override;
 
     u8 ExclusiveRead8(std::size_t core_index, VAddr addr) override;

@@ -4,9 +4,9 @@
 
 #include <cinttypes>
 #include <memory>
-#include <dynarmic/A32/a32.h>
-#include <dynarmic/A32/config.h>
-#include <dynarmic/A32/context.h>
+#include <dynarmic/interface/A32/a32.h>
+#include <dynarmic/interface/A32/config.h>
+#include <dynarmic/interface/A32/context.h>
 #include "common/assert.h"
 #include "common/logging/log.h"
 #include "common/page_table.h"
@@ -24,45 +24,46 @@ namespace Core {
 
 class DynarmicCallbacks32 : public Dynarmic::A32::UserCallbacks {
 public:
-    explicit DynarmicCallbacks32(ARM_Dynarmic_32& parent) : parent(parent) {}
+    explicit DynarmicCallbacks32(ARM_Dynarmic_32& parent_)
+        : parent{parent_}, memory(parent.system.Memory()) {}
 
     u8 MemoryRead8(u32 vaddr) override {
-        return parent.system.Memory().Read8(vaddr);
+        return memory.Read8(vaddr);
     }
     u16 MemoryRead16(u32 vaddr) override {
-        return parent.system.Memory().Read16(vaddr);
+        return memory.Read16(vaddr);
     }
     u32 MemoryRead32(u32 vaddr) override {
-        return parent.system.Memory().Read32(vaddr);
+        return memory.Read32(vaddr);
     }
     u64 MemoryRead64(u32 vaddr) override {
-        return parent.system.Memory().Read64(vaddr);
+        return memory.Read64(vaddr);
     }
 
     void MemoryWrite8(u32 vaddr, u8 value) override {
-        parent.system.Memory().Write8(vaddr, value);
+        memory.Write8(vaddr, value);
     }
     void MemoryWrite16(u32 vaddr, u16 value) override {
-        parent.system.Memory().Write16(vaddr, value);
+        memory.Write16(vaddr, value);
     }
     void MemoryWrite32(u32 vaddr, u32 value) override {
-        parent.system.Memory().Write32(vaddr, value);
+        memory.Write32(vaddr, value);
     }
     void MemoryWrite64(u32 vaddr, u64 value) override {
-        parent.system.Memory().Write64(vaddr, value);
+        memory.Write64(vaddr, value);
     }
 
     bool MemoryWriteExclusive8(u32 vaddr, u8 value, u8 expected) override {
-        return parent.system.Memory().WriteExclusive8(vaddr, value, expected);
+        return memory.WriteExclusive8(vaddr, value, expected);
     }
     bool MemoryWriteExclusive16(u32 vaddr, u16 value, u16 expected) override {
-        return parent.system.Memory().WriteExclusive16(vaddr, value, expected);
+        return memory.WriteExclusive16(vaddr, value, expected);
     }
     bool MemoryWriteExclusive32(u32 vaddr, u32 value, u32 expected) override {
-        return parent.system.Memory().WriteExclusive32(vaddr, value, expected);
+        return memory.WriteExclusive32(vaddr, value, expected);
     }
     bool MemoryWriteExclusive64(u32 vaddr, u64 value, u64 expected) override {
-        return parent.system.Memory().WriteExclusive64(vaddr, value, expected);
+        return memory.WriteExclusive64(vaddr, value, expected);
     }
 
     void InterpreterFallback(u32 pc, std::size_t num_instructions) override {
@@ -78,7 +79,9 @@ public:
     }
 
     void CallSVC(u32 swi) override {
-        Kernel::Svc::Call(parent.system, swi);
+        parent.svc_called = true;
+        parent.svc_swi = swi;
+        parent.jit->HaltExecution();
     }
 
     void AddTicks(u64 ticks) override {
@@ -110,6 +113,7 @@ public:
     }
 
     ARM_Dynarmic_32& parent;
+    Core::Memory::Memory& memory;
     std::size_t num_interpreted_instructions{};
     static constexpr u64 minimum_run_cycles = 1000U;
 };
@@ -142,7 +146,7 @@ std::shared_ptr<Dynarmic::A32::Jit> ARM_Dynarmic_32::MakeJit(Common::PageTable* 
     config.far_code_offset = 256 * 1024 * 1024;
 
     // Safe optimizations
-    if (Settings::values.cpu_accuracy == Settings::CPUAccuracy::DebugMode) {
+    if (Settings::values.cpu_accuracy.GetValue() == Settings::CPUAccuracy::DebugMode) {
         if (!Settings::values.cpuopt_page_tables) {
             config.page_table = nullptr;
         }
@@ -170,15 +174,15 @@ std::shared_ptr<Dynarmic::A32::Jit> ARM_Dynarmic_32::MakeJit(Common::PageTable* 
     }
 
     // Unsafe optimizations
-    if (Settings::values.cpu_accuracy == Settings::CPUAccuracy::Unsafe) {
+    if (Settings::values.cpu_accuracy.GetValue() == Settings::CPUAccuracy::Unsafe) {
         config.unsafe_optimizations = true;
-        if (Settings::values.cpuopt_unsafe_unfuse_fma) {
+        if (Settings::values.cpuopt_unsafe_unfuse_fma.GetValue()) {
             config.optimizations |= Dynarmic::OptimizationFlag::Unsafe_UnfuseFMA;
         }
-        if (Settings::values.cpuopt_unsafe_reduce_fp_error) {
+        if (Settings::values.cpuopt_unsafe_reduce_fp_error.GetValue()) {
             config.optimizations |= Dynarmic::OptimizationFlag::Unsafe_ReducedErrorFP;
         }
-        if (Settings::values.cpuopt_unsafe_inaccurate_nan) {
+        if (Settings::values.cpuopt_unsafe_inaccurate_nan.GetValue()) {
             config.optimizations |= Dynarmic::OptimizationFlag::Unsafe_InaccurateNaN;
         }
     }
@@ -187,11 +191,17 @@ std::shared_ptr<Dynarmic::A32::Jit> ARM_Dynarmic_32::MakeJit(Common::PageTable* 
 }
 
 void ARM_Dynarmic_32::Run() {
-    jit->Run();
-}
-
-void ARM_Dynarmic_32::ExceptionalExit() {
-    jit->ExceptionalExit();
+    while (true) {
+        jit->Run();
+        if (!svc_called) {
+            break;
+        }
+        svc_called = false;
+        Kernel::Svc::Call(system, svc_swi);
+        if (shutdown) {
+            break;
+        }
+    }
 }
 
 void ARM_Dynarmic_32::Step() {
@@ -255,10 +265,6 @@ void ARM_Dynarmic_32::SetTPIDR_EL0(u64 value) {
     cp15->uprw = static_cast<u32>(value);
 }
 
-void ARM_Dynarmic_32::ChangeProcessorID(std::size_t new_core_id) {
-    jit->ChangeProcessorID(new_core_id);
-}
-
 void ARM_Dynarmic_32::SaveContext(ThreadContext32& ctx) {
     Dynarmic::A32::Context context;
     jit->SaveContext(context);
@@ -279,6 +285,7 @@ void ARM_Dynarmic_32::LoadContext(const ThreadContext32& ctx) {
 
 void ARM_Dynarmic_32::PrepareReschedule() {
     jit->HaltExecution();
+    shutdown = true;
 }
 
 void ARM_Dynarmic_32::ClearInstructionCache() {

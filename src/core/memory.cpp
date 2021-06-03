@@ -82,22 +82,6 @@ struct Memory::Impl {
         return nullptr;
     }
 
-    u8* GetKernelBuffer(VAddr start_vaddr, size_t size) {
-        // TODO(bunnei): This is just a workaround until we have kernel memory layout mapped &
-        // managed. Until then, we use this to allocate and access kernel memory regions.
-
-        auto search = kernel_memory_regions.find(start_vaddr);
-        if (search != kernel_memory_regions.end()) {
-            return search->second.get();
-        }
-
-        std::unique_ptr<u8[]> new_memory_region{new u8[size]};
-        u8* raw_ptr = new_memory_region.get();
-        kernel_memory_regions[start_vaddr] = std::move(new_memory_region);
-
-        return raw_ptr;
-    }
-
     u8 Read8(const VAddr addr) {
         return Read<u8>(addr);
     }
@@ -607,7 +591,15 @@ struct Memory::Impl {
      * @returns The instance of T read from the specified virtual address.
      */
     template <typename T>
-    T Read(const VAddr vaddr) {
+    T Read(VAddr vaddr) {
+        // AARCH64 masks the upper 16 bit of all memory accesses
+        vaddr &= 0xffffffffffffLL;
+
+        if (vaddr >= 1uLL << current_page_table->GetAddressSpaceBits()) {
+            LOG_ERROR(HW_Memory, "Unmapped Read{} @ 0x{:08X}", sizeof(T) * 8, vaddr);
+            return 0;
+        }
+
         // Avoid adding any extra logic to this fast-path block
         const uintptr_t raw_pointer = current_page_table->pointers[vaddr >> PAGE_BITS].Raw();
         if (const u8* const pointer = Common::PageTable::PageInfo::ExtractPointer(raw_pointer)) {
@@ -645,7 +637,16 @@ struct Memory::Impl {
      *           is undefined.
      */
     template <typename T>
-    void Write(const VAddr vaddr, const T data) {
+    void Write(VAddr vaddr, const T data) {
+        // AARCH64 masks the upper 16 bit of all memory accesses
+        vaddr &= 0xffffffffffffLL;
+
+        if (vaddr >= 1uLL << current_page_table->GetAddressSpaceBits()) {
+            LOG_ERROR(HW_Memory, "Unmapped Write{} 0x{:08X} @ 0x{:016X}", sizeof(data) * 8,
+                      static_cast<u32>(data), vaddr);
+            return;
+        }
+
         // Avoid adding any extra logic to this fast-path block
         const uintptr_t raw_pointer = current_page_table->pointers[vaddr >> PAGE_BITS].Raw();
         if (u8* const pointer = Common::PageTable::PageInfo::ExtractPointer(raw_pointer)) {
@@ -672,7 +673,16 @@ struct Memory::Impl {
     }
 
     template <typename T>
-    bool WriteExclusive(const VAddr vaddr, const T data, const T expected) {
+    bool WriteExclusive(VAddr vaddr, const T data, const T expected) {
+        // AARCH64 masks the upper 16 bit of all memory accesses
+        vaddr &= 0xffffffffffffLL;
+
+        if (vaddr >= 1uLL << current_page_table->GetAddressSpaceBits()) {
+            LOG_ERROR(HW_Memory, "Unmapped Write{} 0x{:08X} @ 0x{:016X}", sizeof(data) * 8,
+                      static_cast<u32>(data), vaddr);
+            return true;
+        }
+
         const uintptr_t raw_pointer = current_page_table->pointers[vaddr >> PAGE_BITS].Raw();
         if (u8* const pointer = Common::PageTable::PageInfo::ExtractPointer(raw_pointer)) {
             // NOTE: Avoid adding any extra logic to this fast-path block
@@ -699,7 +709,16 @@ struct Memory::Impl {
         return true;
     }
 
-    bool WriteExclusive128(const VAddr vaddr, const u128 data, const u128 expected) {
+    bool WriteExclusive128(VAddr vaddr, const u128 data, const u128 expected) {
+        // AARCH64 masks the upper 16 bit of all memory accesses
+        vaddr &= 0xffffffffffffLL;
+
+        if (vaddr >= 1uLL << current_page_table->GetAddressSpaceBits()) {
+            LOG_ERROR(HW_Memory, "Unmapped Write{} 0x{:08X} @ 0x{:016X}", sizeof(data) * 8,
+                      static_cast<u32>(data[0]), vaddr);
+            return true;
+        }
+
         const uintptr_t raw_pointer = current_page_table->pointers[vaddr >> PAGE_BITS].Raw();
         if (u8* const pointer = Common::PageTable::PageInfo::ExtractPointer(raw_pointer)) {
             // NOTE: Avoid adding any extra logic to this fast-path block
@@ -727,7 +746,6 @@ struct Memory::Impl {
     }
 
     Common::PageTable* current_page_table = nullptr;
-    std::unordered_map<VAddr, std::unique_ptr<u8[]>> kernel_memory_regions;
     Core::System& system;
 };
 
@@ -763,10 +781,6 @@ bool Memory::IsValidVirtualAddress(const VAddr vaddr) const {
 
 u8* Memory::GetPointer(VAddr vaddr) {
     return impl->GetPointer(vaddr);
-}
-
-u8* Memory::GetKernelBuffer(VAddr start_vaddr, size_t size) {
-    return impl->GetKernelBuffer(start_vaddr, size);
 }
 
 const u8* Memory::GetPointer(VAddr vaddr) const {

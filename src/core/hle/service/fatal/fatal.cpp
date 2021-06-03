@@ -6,7 +6,6 @@
 #include <cstring>
 #include <ctime>
 #include <fmt/chrono.h>
-#include "common/file_util.h"
 #include "common/logging/log.h"
 #include "common/scm_rev.h"
 #include "common/swap.h"
@@ -136,7 +135,7 @@ void Module::Interface::ThrowFatal(Kernel::HLERequestContext& ctx) {
 
     ThrowFatalError(system, error_code, FatalType::ErrorScreen, {});
     IPC::ResponseBuilder rb{ctx, 2};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
 }
 
 void Module::Interface::ThrowFatalWithPolicy(Kernel::HLERequestContext& ctx) {
@@ -148,7 +147,7 @@ void Module::Interface::ThrowFatalWithPolicy(Kernel::HLERequestContext& ctx) {
     ThrowFatalError(system, error_code, fatal_type,
                     {}); // No info is passed with ThrowFatalWithPolicy
     IPC::ResponseBuilder rb{ctx, 2};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
 }
 
 void Module::Interface::ThrowFatalWithCpuContext(Kernel::HLERequestContext& ctx) {
@@ -164,7 +163,7 @@ void Module::Interface::ThrowFatalWithCpuContext(Kernel::HLERequestContext& ctx)
 
     ThrowFatalError(system, error_code, fatal_type, info);
     IPC::ResponseBuilder rb{ctx, 2};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
 }
 
 void InstallInterfaces(SM::ServiceManager& service_manager, Core::System& system) {

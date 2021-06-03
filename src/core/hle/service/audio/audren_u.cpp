@@ -65,7 +65,7 @@ private:
         LOG_DEBUG(Service_Audio, "called");
 
         IPC::ResponseBuilder rb{ctx, 3};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push<u32>(renderer->GetSampleRate());
     }
 
@@ -73,7 +73,7 @@ private:
         LOG_DEBUG(Service_Audio, "called");
 
         IPC::ResponseBuilder rb{ctx, 3};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push<u32>(renderer->GetSampleCount());
     }
 
@@ -81,7 +81,7 @@ private:
         LOG_DEBUG(Service_Audio, "called");
 
         IPC::ResponseBuilder rb{ctx, 3};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push<u32>(static_cast<u32>(renderer->GetStreamState()));
     }
 
@@ -89,7 +89,7 @@ private:
         LOG_DEBUG(Service_Audio, "called");
 
         IPC::ResponseBuilder rb{ctx, 3};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push<u32>(renderer->GetMixBufferCount());
     }
 
@@ -112,7 +112,7 @@ private:
 
         IPC::ResponseBuilder rb{ctx, 2};
 
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void Stop(Kernel::HLERequestContext& ctx) {
@@ -120,14 +120,14 @@ private:
 
         IPC::ResponseBuilder rb{ctx, 2};
 
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void QuerySystemEvent(Kernel::HLERequestContext& ctx) {
         LOG_WARNING(Service_Audio, "(STUBBED) called");
 
         IPC::ResponseBuilder rb{ctx, 2, 1};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.PushCopyObjects(system_event.GetReadableEvent());
     }
 
@@ -140,14 +140,14 @@ private:
         ASSERT(rendering_time_limit_percent <= 100);
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void GetRenderingTimeLimit(Kernel::HLERequestContext& ctx) {
         LOG_DEBUG(Service_Audio, "called");
 
         IPC::ResponseBuilder rb{ctx, 3};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push(rendering_time_limit_percent);
     }
 
@@ -169,10 +169,9 @@ private:
 
 class IAudioDevice final : public ServiceFramework<IAudioDevice> {
 public:
-    explicit IAudioDevice(Core::System& system_, u32_le revision_num)
-        : ServiceFramework{system_, "IAudioDevice"}, revision{revision_num},
-          buffer_event{system.Kernel()}, audio_input_device_switch_event{system.Kernel()},
-          audio_output_device_switch_event{system.Kernel()} {
+    explicit IAudioDevice(Core::System& system_, Kernel::KEvent& buffer_event_, u32_le revision_)
+        : ServiceFramework{system_, "IAudioDevice"}, buffer_event{buffer_event_}, revision{
+                                                                                      revision_} {
         static const FunctionInfo functions[] = {
             {0, &IAudioDevice::ListAudioDeviceName, "ListAudioDeviceName"},
             {1, &IAudioDevice::SetAudioDeviceOutputVolume, "SetAudioDeviceOutputVolume"},
@@ -189,18 +188,6 @@ public:
             {13, nullptr, "GetAudioSystemMasterVolumeSetting"},
         };
         RegisterHandlers(functions);
-
-        Kernel::KAutoObject::Create(std::addressof(buffer_event));
-        buffer_event.Initialize("IAudioOutBufferReleasedEvent");
-
-        // Should be similar to audio_output_device_switch_event
-        Kernel::KAutoObject::Create(std::addressof(audio_input_device_switch_event));
-        audio_input_device_switch_event.Initialize("IAudioDevice:AudioInputDeviceSwitchedEvent");
-
-        // Should only be signalled when an audio output device has been changed, example: speaker
-        // to headset
-        Kernel::KAutoObject::Create(std::addressof(audio_output_device_switch_event));
-        audio_output_device_switch_event.Initialize("IAudioDevice:AudioOutputDeviceSwitchedEvent");
     }
 
 private:
@@ -243,7 +230,7 @@ private:
         ctx.WriteBuffer(name_buffer);
 
         IPC::ResponseBuilder rb{ctx, 3};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push(static_cast<u32>(name_buffer.size()));
     }
 
@@ -257,7 +244,7 @@ private:
         LOG_WARNING(Service_Audio, "(STUBBED) called. name={}, volume={}", name, volume);
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void GetAudioDeviceOutputVolume(Kernel::HLERequestContext& ctx) {
@@ -267,7 +254,7 @@ private:
         LOG_WARNING(Service_Audio, "(STUBBED) called. name={}", name);
 
         IPC::ResponseBuilder rb{ctx, 3};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push(1.0f);
     }
 
@@ -283,7 +270,7 @@ private:
         ctx.WriteBuffer(out_device_name);
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void QueryAudioDeviceSystemEvent(Kernel::HLERequestContext& ctx) {
@@ -292,7 +279,7 @@ private:
         buffer_event.GetWritableEvent().Signal();
 
         IPC::ResponseBuilder rb{ctx, 2, 1};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.PushCopyObjects(buffer_event.GetReadableEvent());
     }
 
@@ -300,7 +287,7 @@ private:
         LOG_WARNING(Service_Audio, "(STUBBED) called");
 
         IPC::ResponseBuilder rb{ctx, 3};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push<u32>(1);
     }
 
@@ -309,26 +296,25 @@ private:
         LOG_WARNING(Service_Audio, "(STUBBED) called");
 
         IPC::ResponseBuilder rb{ctx, 2, 1};
-        rb.Push(RESULT_SUCCESS);
-        rb.PushCopyObjects(audio_input_device_switch_event.GetReadableEvent());
+        rb.Push(ResultSuccess);
+        rb.PushCopyObjects(buffer_event.GetReadableEvent());
     }
 
     void QueryAudioDeviceOutputEvent(Kernel::HLERequestContext& ctx) {
         LOG_DEBUG(Service_Audio, "called");
 
         IPC::ResponseBuilder rb{ctx, 2, 1};
-        rb.Push(RESULT_SUCCESS);
-        rb.PushCopyObjects(audio_output_device_switch_event.GetReadableEvent());
+        rb.Push(ResultSuccess);
+        rb.PushCopyObjects(buffer_event.GetReadableEvent());
     }
 
+    Kernel::KEvent& buffer_event;
     u32_le revision = 0;
-    Kernel::KEvent buffer_event;
-    Kernel::KEvent audio_input_device_switch_event;
-    Kernel::KEvent audio_output_device_switch_event;
+};
 
-}; // namespace Audio
+AudRenU::AudRenU(Core::System& system_)
+    : ServiceFramework{system_, "audren:u"}, buffer_event{system.Kernel()} {
 
-AudRenU::AudRenU(Core::System& system_) : ServiceFramework{system_, "audren:u"} {
     // clang-format off
     static const FunctionInfo functions[] = {
         {0, &AudRenU::OpenAudioRenderer, "OpenAudioRenderer"},
@@ -340,6 +326,9 @@ AudRenU::AudRenU(Core::System& system_) : ServiceFramework{system_, "audren:u"} 
     // clang-format on
 
     RegisterHandlers(functions);
+
+    Kernel::KAutoObject::Create(std::addressof(buffer_event));
+    buffer_event.Initialize("IAudioOutBufferReleasedEvent");
 }
 
 AudRenU::~AudRenU() = default;
@@ -373,7 +362,7 @@ void AudRenU::GetAudioRendererWorkBufferSize(Kernel::HLERequestContext& ctx) {
     static constexpr u64 max_perf_detail_entries = 100;
 
     // Size of the data structure representing the bulk of the voice-related state.
-    static constexpr u64 voice_state_size = 0x100;
+    static constexpr u64 voice_state_size_bytes = 0x100;
 
     // Size of the upsampler manager data structure
     constexpr u64 upsampler_manager_size = 0x48;
@@ -460,7 +449,8 @@ void AudRenU::GetAudioRendererWorkBufferSize(Kernel::HLERequestContext& ctx) {
         size += Common::AlignUp(voice_info_size * params.voice_count, info_field_alignment_size);
         size +=
             Common::AlignUp(voice_resource_size * params.voice_count, info_field_alignment_size);
-        size += Common::AlignUp(voice_state_size * params.voice_count, info_field_alignment_size);
+        size +=
+            Common::AlignUp(voice_state_size_bytes * params.voice_count, info_field_alignment_size);
         return size;
     };
 
@@ -646,7 +636,7 @@ void AudRenU::GetAudioRendererWorkBufferSize(Kernel::HLERequestContext& ctx) {
     size = Common::AlignUp(size, 4096);
 
     IPC::ResponseBuilder rb{ctx, 4};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.Push<u64>(size);
 
     LOG_DEBUG(Service_Audio, "buffer_size=0x{:X}", size);
@@ -661,8 +651,8 @@ void AudRenU::GetAudioDeviceService(Kernel::HLERequestContext& ctx) {
     // Revisionless variant of GetAudioDeviceServiceWithRevisionInfo that
     // always assumes the initial release revision (REV1).
     IPC::ResponseBuilder rb{ctx, 2, 0, 1};
-    rb.Push(RESULT_SUCCESS);
-    rb.PushIpcInterface<IAudioDevice>(system, Common::MakeMagic('R', 'E', 'V', '1'));
+    rb.Push(ResultSuccess);
+    rb.PushIpcInterface<IAudioDevice>(system, buffer_event, Common::MakeMagic('R', 'E', 'V', '1'));
 }
 
 void AudRenU::OpenAudioRendererForManualExecution(Kernel::HLERequestContext& ctx) {
@@ -683,8 +673,8 @@ void AudRenU::GetAudioDeviceServiceWithRevisionInfo(Kernel::HLERequestContext& c
     LOG_DEBUG(Service_Audio, "called. revision={:08X}, aruid={:016X}", revision, aruid);
 
     IPC::ResponseBuilder rb{ctx, 2, 0, 1};
-    rb.Push(RESULT_SUCCESS);
-    rb.PushIpcInterface<IAudioDevice>(system, revision);
+    rb.Push(ResultSuccess);
+    rb.PushIpcInterface<IAudioDevice>(system, buffer_event, revision);
 }
 
 void AudRenU::OpenAudioRendererImpl(Kernel::HLERequestContext& ctx) {
@@ -692,7 +682,7 @@ void AudRenU::OpenAudioRendererImpl(Kernel::HLERequestContext& ctx) {
     const auto params = rp.PopRaw<AudioCommon::AudioRendererParameter>();
     IPC::ResponseBuilder rb{ctx, 2, 0, 1};
 
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.PushIpcInterface<IAudioRenderer>(system, params, audren_instance_count++);
 }
 

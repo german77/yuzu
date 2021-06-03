@@ -68,8 +68,8 @@ static std::vector<std::string> BuildLocationNameCache(Core::System& system) {
     return location_name_cache;
 }
 
-TimeZoneContentManager::TimeZoneContentManager(Core::System& system)
-    : system{system}, location_name_cache{BuildLocationNameCache(system)} {}
+TimeZoneContentManager::TimeZoneContentManager(Core::System& system_)
+    : system{system_}, location_name_cache{BuildLocationNameCache(system)} {}
 
 void TimeZoneContentManager::Initialize(TimeManager& time_manager) {
     std::string location_name;
@@ -81,7 +81,7 @@ void TimeZoneContentManager::Initialize(TimeManager& time_manager) {
     }
 
     if (FileSys::VirtualFile vfs_file;
-        GetTimeZoneInfoFile(location_name, vfs_file) == RESULT_SUCCESS) {
+        GetTimeZoneInfoFile(location_name, vfs_file) == ResultSuccess) {
         const auto time_point{
             time_manager.GetStandardSteadyClockCore().GetCurrentTimePoint(system)};
         time_manager.SetupTimeZoneManager(location_name, time_point, location_name_cache.size(), {},
@@ -95,7 +95,7 @@ ResultCode TimeZoneContentManager::LoadTimeZoneRule(TimeZoneRule& rules,
                                                     const std::string& location_name) const {
     FileSys::VirtualFile vfs_file;
     if (const ResultCode result{GetTimeZoneInfoFile(location_name, vfs_file)};
-        result != RESULT_SUCCESS) {
+        result != ResultSuccess) {
         return result;
     }
 
@@ -138,7 +138,7 @@ ResultCode TimeZoneContentManager::GetTimeZoneInfoFile(const std::string& locati
         return ERROR_TIME_NOT_FOUND;
     }
 
-    return RESULT_SUCCESS;
+    return ResultSuccess;
 }
 
 } // namespace Service::Time::TimeZone

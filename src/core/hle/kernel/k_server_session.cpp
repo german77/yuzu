@@ -23,7 +23,8 @@
 
 namespace Kernel {
 
-KServerSession::KServerSession(KernelCore& kernel_) : KSynchronizationObject{kernel_} {}
+KServerSession::KServerSession(KernelCore& kernel_)
+    : KSynchronizationObject{kernel_}, manager{std::make_shared<SessionRequestManager>()} {}
 
 KServerSession::~KServerSession() {
     kernel.ReleaseServiceThread(service_thread);
@@ -43,14 +44,8 @@ void KServerSession::Destroy() {
 }
 
 void KServerSession::OnClientClosed() {
-    // We keep a shared pointer to the hle handler to keep it alive throughout
-    // the call to ClientDisconnected, as ClientDisconnected invalidates the
-    // hle_handler member itself during the course of the function executing.
-    std::shared_ptr<SessionRequestHandler> handler = hle_handler;
-    if (handler) {
-        // Note that after this returns, this server session's hle_handler is
-        // invalidated (set to null).
-        handler->ClientDisconnected(this);
+    if (manager->HasSessionHandler()) {
+        manager->SessionHandler().ClientDisconnected(this);
     }
 }
 
@@ -66,51 +61,51 @@ bool KServerSession::IsSignaled() const {
     return false;
 }
 
-void KServerSession::AppendDomainRequestHandler(std::shared_ptr<SessionRequestHandler> handler) {
-    domain_request_handlers.push_back(std::move(handler));
+void KServerSession::AppendDomainHandler(SessionRequestHandlerPtr handler) {
+    manager->AppendDomainHandler(std::move(handler));
 }
 
 std::size_t KServerSession::NumDomainRequestHandlers() const {
-    return domain_request_handlers.size();
+    return manager->DomainHandlerCount();
 }
 
 ResultCode KServerSession::HandleDomainSyncRequest(Kernel::HLERequestContext& context) {
     if (!context.HasDomainMessageHeader()) {
-        return RESULT_SUCCESS;
+        return ResultSuccess;
     }
 
     // Set domain handlers in HLE context, used for domain objects (IPC interfaces) as inputs
-    context.SetDomainRequestHandlers(domain_request_handlers);
+    context.SetSessionRequestManager(manager);
 
     // If there is a DomainMessageHeader, then this is CommandType "Request"
     const auto& domain_message_header = context.GetDomainMessageHeader();
     const u32 object_id{domain_message_header.object_id};
     switch (domain_message_header.command) {
     case IPC::DomainMessageHeader::CommandType::SendMessage:
-        if (object_id > domain_request_handlers.size()) {
+        if (object_id > manager->DomainHandlerCount()) {
             LOG_CRITICAL(IPC,
                          "object_id {} is too big! This probably means a recent service call "
                          "to {} needed to return a new interface!",
                          object_id, name);
             UNREACHABLE();
-            return RESULT_SUCCESS; // Ignore error if asserts are off
+            return ResultSuccess; // Ignore error if asserts are off
         }
-        return domain_request_handlers[object_id - 1]->HandleSyncRequest(context);
+        return manager->DomainHandler(object_id - 1)->HandleSyncRequest(*this, context);
 
     case IPC::DomainMessageHeader::CommandType::CloseVirtualHandle: {
         LOG_DEBUG(IPC, "CloseVirtualHandle, object_id=0x{:08X}", object_id);
 
-        domain_request_handlers[object_id - 1] = nullptr;
+        manager->CloseDomainHandler(object_id - 1);
 
         IPC::ResponseBuilder rb{context, 2};
-        rb.Push(RESULT_SUCCESS);
-        return RESULT_SUCCESS;
+        rb.Push(ResultSuccess);
+        return ResultSuccess;
     }
     }
 
     LOG_CRITICAL(IPC, "Unknown domain command={}", domain_message_header.command.Value());
     ASSERT(false);
-    return RESULT_SUCCESS;
+    return ResultSuccess;
 }
 
 ResultCode KServerSession::QueueSyncRequest(KThread* thread, Core::Memory::Memory& memory) {
@@ -121,26 +116,26 @@ ResultCode KServerSession::QueueSyncRequest(KThread* thread, Core::Memory::Memor
 
     if (auto strong_ptr = service_thread.lock()) {
         strong_ptr->QueueSyncRequest(*parent, std::move(context));
-        return RESULT_SUCCESS;
+        return ResultSuccess;
     }
 
-    return RESULT_SUCCESS;
+    return ResultSuccess;
 }
 
 ResultCode KServerSession::CompleteSyncRequest(HLERequestContext& context) {
-    ResultCode result = RESULT_SUCCESS;
+    ResultCode result = ResultSuccess;
     // If the session has been converted to a domain, handle the domain request
     if (IsDomain() && context.HasDomainMessageHeader()) {
         result = HandleDomainSyncRequest(context);
         // If there is no domain header, the regular session handler is used
-    } else if (hle_handler != nullptr) {
+    } else if (manager->HasSessionHandler()) {
         // If this ServerSession has an associated HLE handler, forward the request to it.
-        result = hle_handler->HandleSyncRequest(context);
+        result = manager->SessionHandler().HandleSyncRequest(*this, context);
     }
 
     if (convert_to_domain) {
-        ASSERT_MSG(IsSession(), "ServerSession is already a domain instance.");
-        domain_request_handlers = {hle_handler};
+        ASSERT_MSG(!IsDomain(), "ServerSession is already a domain instance.");
+        manager->ConvertToDomain();
         convert_to_domain = false;
     }
 

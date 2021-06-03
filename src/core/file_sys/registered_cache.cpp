@@ -7,11 +7,12 @@
 #include <regex>
 #include <mbedtls/sha256.h>
 #include "common/assert.h"
-#include "common/file_util.h"
+#include "common/fs/path_util.h"
 #include "common/hex_util.h"
 #include "common/logging/log.h"
 #include "core/crypto/key_manager.h"
 #include "core/file_sys/card_image.h"
+#include "core/file_sys/common_funcs.h"
 #include "core/file_sys/content_archive.h"
 #include "core/file_sys/nca_metadata.h"
 #include "core/file_sys/registered_cache.h"
@@ -592,6 +593,12 @@ InstallResult RegisteredCache::InstallEntry(const NSP& nsp, bool overwrite_if_ex
     const CNMT cnmt(cnmt_file);
 
     const auto title_id = cnmt.GetTitleID();
+    const auto version = cnmt.GetTitleVersion();
+
+    if (title_id == GetBaseTitleID(title_id) && version == 0) {
+        return InstallResult::ErrorBaseInstall;
+    }
+
     const auto result = RemoveExistingEntry(title_id);
 
     // Install Metadata File

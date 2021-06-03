@@ -21,7 +21,7 @@ class SystemClockContextUpdateCallback;
 
 class SystemClockCore {
 public:
-    explicit SystemClockCore(SteadyClockCore& steady_clock_core);
+    explicit SystemClockCore(SteadyClockCore& steady_clock_core_);
     virtual ~SystemClockCore();
 
     SteadyClockCore& GetSteadyClockCore() const {
@@ -35,12 +35,12 @@ public:
     virtual ResultCode GetClockContext([[maybe_unused]] Core::System& system,
                                        SystemClockContext& value) const {
         value = context;
-        return RESULT_SUCCESS;
+        return ResultSuccess;
     }
 
     virtual ResultCode SetClockContext(const SystemClockContext& value) {
         context = value;
-        return RESULT_SUCCESS;
+        return ResultSuccess;
     }
 
     virtual ResultCode Flush(const SystemClockContext& clock_context);

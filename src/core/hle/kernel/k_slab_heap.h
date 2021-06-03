@@ -11,6 +11,8 @@
 
 namespace Kernel {
 
+class KernelCore;
+
 namespace impl {
 
 class KSlabHeapImpl final : NonCopyable {
@@ -135,35 +137,80 @@ private:
 template <typename T>
 class KSlabHeap final : public KSlabHeapBase {
 public:
-    constexpr KSlabHeap() : KSlabHeapBase() {}
+    enum class AllocationType {
+        Host,
+        Guest,
+    };
+
+    explicit constexpr KSlabHeap(AllocationType allocation_type_ = AllocationType::Host)
+        : KSlabHeapBase(), allocation_type{allocation_type_} {}
 
     void Initialize(void* memory, std::size_t memory_size) {
-        InitializeImpl(sizeof(T), memory, memory_size);
+        if (allocation_type == AllocationType::Guest) {
+            InitializeImpl(sizeof(T), memory, memory_size);
+        }
     }
 
     T* Allocate() {
-        T* obj = static_cast<T*>(AllocateImpl());
-        if (obj != nullptr) {
-            new (obj) T();
+        switch (allocation_type) {
+        case AllocationType::Host:
+            // Fallback for cases where we do not yet support allocating guest memory from the slab
+            // heap, such as for kernel memory regions.
+            return new T;
+
+        case AllocationType::Guest:
+            T* obj = static_cast<T*>(AllocateImpl());
+            if (obj != nullptr) {
+                new (obj) T();
+            }
+            return obj;
         }
-        return obj;
+
+        UNREACHABLE_MSG("Invalid AllocationType {}", allocation_type);
+        return nullptr;
     }
 
     T* AllocateWithKernel(KernelCore& kernel) {
-        T* obj = static_cast<T*>(AllocateImpl());
-        if (obj != nullptr) {
-            new (obj) T(kernel);
+        switch (allocation_type) {
+        case AllocationType::Host:
+            // Fallback for cases where we do not yet support allocating guest memory from the slab
+            // heap, such as for kernel memory regions.
+            return new T(kernel);
+
+        case AllocationType::Guest:
+            T* obj = static_cast<T*>(AllocateImpl());
+            if (obj != nullptr) {
+                new (obj) T(kernel);
+            }
+            return obj;
         }
-        return obj;
+
+        UNREACHABLE_MSG("Invalid AllocationType {}", allocation_type);
+        return nullptr;
     }
 
     void Free(T* obj) {
-        FreeImpl(obj);
+        switch (allocation_type) {
+        case AllocationType::Host:
+            // Fallback for cases where we do not yet support allocating guest memory from the slab
+            // heap, such as for kernel memory regions.
+            delete obj;
+            return;
+
+        case AllocationType::Guest:
+            FreeImpl(obj);
+            return;
+        }
+
+        UNREACHABLE_MSG("Invalid AllocationType {}", allocation_type);
     }
 
     constexpr std::size_t GetObjectIndex(const T* obj) const {
         return GetObjectIndexImpl(obj);
     }
+
+private:
+    const AllocationType allocation_type;
 };
 
 } // namespace Kernel

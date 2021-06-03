@@ -214,7 +214,7 @@ private:
 
 class IGBPConnectRequestParcel : public Parcel {
 public:
-    explicit IGBPConnectRequestParcel(std::vector<u8> buffer) : Parcel(std::move(buffer)) {
+    explicit IGBPConnectRequestParcel(std::vector<u8> buffer_) : Parcel(std::move(buffer_)) {
         Deserialize();
     }
 
@@ -276,8 +276,8 @@ private:
 
 class IGBPSetPreallocatedBufferRequestParcel : public Parcel {
 public:
-    explicit IGBPSetPreallocatedBufferRequestParcel(std::vector<u8> buffer)
-        : Parcel(std::move(buffer)) {
+    explicit IGBPSetPreallocatedBufferRequestParcel(std::vector<u8> buffer_)
+        : Parcel(std::move(buffer_)) {
         Deserialize();
     }
 
@@ -314,7 +314,7 @@ protected:
 
 class IGBPCancelBufferRequestParcel : public Parcel {
 public:
-    explicit IGBPCancelBufferRequestParcel(std::vector<u8> buffer) : Parcel(std::move(buffer)) {
+    explicit IGBPCancelBufferRequestParcel(std::vector<u8> buffer_) : Parcel(std::move(buffer_)) {
         Deserialize();
     }
 
@@ -340,7 +340,7 @@ protected:
 
 class IGBPDequeueBufferRequestParcel : public Parcel {
 public:
-    explicit IGBPDequeueBufferRequestParcel(std::vector<u8> buffer) : Parcel(std::move(buffer)) {
+    explicit IGBPDequeueBufferRequestParcel(std::vector<u8> buffer_) : Parcel(std::move(buffer_)) {
         Deserialize();
     }
 
@@ -362,8 +362,8 @@ public:
 
 class IGBPDequeueBufferResponseParcel : public Parcel {
 public:
-    explicit IGBPDequeueBufferResponseParcel(u32 slot, Service::Nvidia::MultiFence& multi_fence)
-        : slot(slot), multi_fence(multi_fence) {}
+    explicit IGBPDequeueBufferResponseParcel(u32 slot_, Nvidia::MultiFence& multi_fence_)
+        : slot(slot_), multi_fence(multi_fence_) {}
 
 protected:
     void SerializeData() override {
@@ -379,7 +379,7 @@ protected:
 
 class IGBPRequestBufferRequestParcel : public Parcel {
 public:
-    explicit IGBPRequestBufferRequestParcel(std::vector<u8> buffer) : Parcel(std::move(buffer)) {
+    explicit IGBPRequestBufferRequestParcel(std::vector<u8> buffer_) : Parcel(std::move(buffer_)) {
         Deserialize();
     }
 
@@ -393,7 +393,7 @@ public:
 
 class IGBPRequestBufferResponseParcel : public Parcel {
 public:
-    explicit IGBPRequestBufferResponseParcel(NVFlinger::IGBPBuffer buffer) : buffer(buffer) {}
+    explicit IGBPRequestBufferResponseParcel(NVFlinger::IGBPBuffer buffer_) : buffer(buffer_) {}
     ~IGBPRequestBufferResponseParcel() override = default;
 
 protected:
@@ -410,7 +410,7 @@ protected:
 
 class IGBPQueueBufferRequestParcel : public Parcel {
 public:
-    explicit IGBPQueueBufferRequestParcel(std::vector<u8> buffer) : Parcel(std::move(buffer)) {
+    explicit IGBPQueueBufferRequestParcel(std::vector<u8> buffer_) : Parcel(std::move(buffer_)) {
         Deserialize();
     }
 
@@ -472,7 +472,7 @@ private:
 
 class IGBPQueryRequestParcel : public Parcel {
 public:
-    explicit IGBPQueryRequestParcel(std::vector<u8> buffer) : Parcel(std::move(buffer)) {
+    explicit IGBPQueryRequestParcel(std::vector<u8> buffer_) : Parcel(std::move(buffer_)) {
         Deserialize();
     }
 
@@ -486,7 +486,7 @@ public:
 
 class IGBPQueryResponseParcel : public Parcel {
 public:
-    explicit IGBPQueryResponseParcel(u32 value) : value(value) {}
+    explicit IGBPQueryResponseParcel(u32 value_) : value{value_} {}
     ~IGBPQueryResponseParcel() override = default;
 
 protected:
@@ -649,7 +649,7 @@ private:
         }
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void AdjustRefcount(Kernel::HLERequestContext& ctx) {
@@ -662,7 +662,7 @@ private:
                     type);
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void GetNativeHandle(Kernel::HLERequestContext& ctx) {
@@ -674,7 +674,7 @@ private:
 
         // TODO(Subv): Find out what this actually is.
         IPC::ResponseBuilder rb{ctx, 2, 1};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.PushCopyObjects(nv_flinger.FindBufferQueue(id)->GetBufferWaitEvent());
     }
 
@@ -747,7 +747,7 @@ private:
                     z_value);
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     // This function currently does nothing but return a success error code in
@@ -760,14 +760,14 @@ private:
         LOG_DEBUG(Service_VI, "called, layer_id=0x{:08X}, visibility={}", layer_id, visibility);
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void GetDisplayMode(Kernel::HLERequestContext& ctx) {
         LOG_WARNING(Service_VI, "(STUBBED) called");
 
         IPC::ResponseBuilder rb{ctx, 6};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
 
         if (Settings::values.use_docked_mode.GetValue()) {
             rb.Push(static_cast<u32>(Service::VI::DisplayResolution::DockedWidth) *
@@ -882,7 +882,7 @@ private:
         LOG_WARNING(Service_VI, "(STUBBED) called. display=0x{:016X}", display);
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void CreateManagedLayer(Kernel::HLERequestContext& ctx) {
@@ -905,7 +905,7 @@ private:
         }
 
         IPC::ResponseBuilder rb{ctx, 4};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push(*layer_id);
     }
 
@@ -918,7 +918,7 @@ private:
                     layer_id);
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void SetLayerVisibility(Kernel::HLERequestContext& ctx) {
@@ -930,7 +930,7 @@ private:
                     visibility);
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     NVFlinger::NVFlinger& nv_flinger;
@@ -961,7 +961,7 @@ private:
         LOG_WARNING(Service_VI, "(STUBBED) called");
 
         IPC::ResponseBuilder rb{ctx, 2, 0, 1};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.PushIpcInterface<IHOSBinderDriver>(system, nv_flinger);
     }
 
@@ -969,7 +969,7 @@ private:
         LOG_WARNING(Service_VI, "(STUBBED) called");
 
         IPC::ResponseBuilder rb{ctx, 2, 0, 1};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.PushIpcInterface<ISystemDisplayService>(system);
     }
 
@@ -977,7 +977,7 @@ private:
         LOG_WARNING(Service_VI, "(STUBBED) called");
 
         IPC::ResponseBuilder rb{ctx, 2, 0, 1};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.PushIpcInterface<IManagerDisplayService>(system, nv_flinger);
     }
 
@@ -985,7 +985,7 @@ private:
         LOG_WARNING(Service_VI, "(STUBBED) called");
 
         IPC::ResponseBuilder rb{ctx, 2, 0, 1};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.PushIpcInterface<IHOSBinderDriver>(system, nv_flinger);
     }
 
@@ -1022,7 +1022,7 @@ private:
         }
 
         IPC::ResponseBuilder rb{ctx, 4};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push<u64>(*display_id);
     }
 
@@ -1033,7 +1033,7 @@ private:
         LOG_WARNING(Service_VI, "(STUBBED) called. display_id=0x{:016X}", display_id);
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     // This literally does nothing internally in the actual service itself,
@@ -1042,7 +1042,7 @@ private:
         LOG_DEBUG(Service_VI, "called.");
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void GetDisplayResolution(Kernel::HLERequestContext& ctx) {
@@ -1052,7 +1052,7 @@ private:
         LOG_DEBUG(Service_VI, "called. display_id=0x{:016X}", display_id);
 
         IPC::ResponseBuilder rb{ctx, 6};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
 
         // This only returns the fixed values of 1280x720 and makes no distinguishing
         // between docked and undocked dimensions. We take the liberty of applying
@@ -1086,7 +1086,7 @@ private:
             return;
         }
 
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void ListDisplays(Kernel::HLERequestContext& ctx) {
@@ -1097,7 +1097,7 @@ private:
         display_info.height *= static_cast<u64>(Settings::values.resolution_factor.GetValue());
         ctx.WriteBuffer(&display_info, sizeof(DisplayInfo));
         IPC::ResponseBuilder rb{ctx, 4};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push<u64>(1);
     }
 
@@ -1133,7 +1133,7 @@ private:
         const auto buffer_size = ctx.WriteBuffer(native_window.Serialize());
 
         IPC::ResponseBuilder rb{ctx, 4};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push<u64>(buffer_size);
     }
 
@@ -1146,7 +1146,7 @@ private:
         nv_flinger.CloseLayer(layer_id);
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void CreateStrayLayer(Kernel::HLERequestContext& ctx) {
@@ -1179,7 +1179,7 @@ private:
         const auto buffer_size = ctx.WriteBuffer(native_window.Serialize());
 
         IPC::ResponseBuilder rb{ctx, 6};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push(*layer_id);
         rb.Push<u64>(buffer_size);
     }
@@ -1191,7 +1191,7 @@ private:
         LOG_WARNING(Service_VI, "(STUBBED) called. layer_id=0x{:016X}", layer_id);
 
         IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void GetDisplayVsyncEvent(Kernel::HLERequestContext& ctx) {
@@ -1209,7 +1209,7 @@ private:
         }
 
         IPC::ResponseBuilder rb{ctx, 2, 1};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.PushCopyObjects(vsync_event);
     }
 
@@ -1222,7 +1222,7 @@ private:
 
         if (converted_mode.Succeeded()) {
             IPC::ResponseBuilder rb{ctx, 4};
-            rb.Push(RESULT_SUCCESS);
+            rb.Push(ResultSuccess);
             rb.PushEnum(*converted_mode);
         } else {
             IPC::ResponseBuilder rb{ctx, 2};
@@ -1253,7 +1253,7 @@ private:
         IPC::ResponseBuilder rb{ctx, 6};
         rb.Push(unknown_result_1);
         rb.Push(unknown_result_2);
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
     }
 
     void GetIndirectLayerImageRequiredMemoryInfo(Kernel::HLERequestContext& ctx) {
@@ -1268,7 +1268,7 @@ private:
         const auto out_size = (texture_size + base_size - 1) / base_size * base_size;
 
         IPC::ResponseBuilder rb{ctx, 6};
-        rb.Push(RESULT_SUCCESS);
+        rb.Push(ResultSuccess);
         rb.Push(out_size);
         rb.Push(alignment);
     }
@@ -1350,7 +1350,7 @@ void detail::GetDisplayServiceImpl(Kernel::HLERequestContext& ctx, Core::System&
     }
 
     IPC::ResponseBuilder rb{ctx, 2, 0, 1};
-    rb.Push(RESULT_SUCCESS);
+    rb.Push(ResultSuccess);
     rb.PushIpcInterface<IApplicationDisplayService>(system, nv_flinger);
 }
 

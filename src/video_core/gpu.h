@@ -247,6 +247,8 @@ public:
         return use_nvdec;
     }
 
+    void RendererFrameEndNotify();
+
     enum class FenceOperation : u32 {
         Acquire = 0,
         Increment = 1,
@@ -387,6 +389,8 @@ private:
     std::unique_ptr<Engines::KeplerMemory> kepler_memory;
     /// Shader build notifier
     std::unique_ptr<VideoCore::ShaderNotify> shader_notify;
+    /// When true, we are about to shut down emulation session, so terminate outstanding tasks
+    std::atomic_bool shutting_down{};
 
     std::array<std::atomic<u32>, Service::Nvidia::MaxSyncPoints> syncpoints{};
 

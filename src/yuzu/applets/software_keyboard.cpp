@@ -404,12 +404,16 @@ void QtSoftwareKeyboardDialog::ShowTextCheckDialog(
 
         OverlayDialog dialog(this, system, QString{}, QString::fromStdU16String(text_check_message),
                              tr("Cancel"), tr("OK"), Qt::AlignCenter);
-        if (dialog.exec() == QDialog::Accepted) {
-            emit SubmitNormalText(SwkbdResult::Ok, current_text);
+        if (dialog.exec() != QDialog::Accepted) {
+            StartInputThread();
             break;
         }
 
-        StartInputThread();
+        auto text = ui->topOSK->currentIndex() == 1
+                        ? ui->text_edit_osk->toPlainText().toStdU16String()
+                        : ui->line_edit_osk->text().toStdU16String();
+
+        emit SubmitNormalText(SwkbdResult::Ok, std::move(text));
         break;
     }
     }
@@ -480,11 +484,7 @@ void QtSoftwareKeyboardDialog::open() {
 void QtSoftwareKeyboardDialog::reject() {
     // Pressing the ESC key in a dialog calls QDialog::reject().
     // We will override this behavior to the "Cancel" action on the software keyboard.
-    if (is_inline) {
-        emit SubmitInlineText(SwkbdReplyType::DecidedCancel, current_text, cursor_position);
-    } else {
-        emit SubmitNormalText(SwkbdResult::Cancel, current_text);
-    }
+    TranslateButtonPress(HIDButton::X);
 }
 
 void QtSoftwareKeyboardDialog::keyPressEvent(QKeyEvent* event) {
@@ -720,21 +720,9 @@ void QtSoftwareKeyboardDialog::SetTextDrawType() {
                     ui->line_edit_osk->setFocus();
                 });
 
-        connect(ui->line_edit_osk, &QLineEdit::returnPressed, [this] {
-            switch (bottom_osk_index) {
-            case BottomOSKIndex::LowerCase:
-                ui->button_ok->click();
-                break;
-            case BottomOSKIndex::UpperCase:
-                ui->button_ok_shift->click();
-                break;
-            case BottomOSKIndex::NumberPad:
-                ui->button_ok_num->click();
-                break;
-            default:
-                break;
-            }
-        });
+        connect(
+            ui->line_edit_osk, &QLineEdit::returnPressed, this,
+            [this] { TranslateButtonPress(HIDButton::Plus); }, Qt::QueuedConnection);
 
         ui->line_edit_osk->setPlaceholderText(
             QString::fromStdU16String(initialize_parameters.guide_text));
@@ -1113,12 +1101,11 @@ void QtSoftwareKeyboardDialog::NormalKeyboardButtonClicked(QPushButton* button) 
     }
 
     if (button == ui->button_ok || button == ui->button_ok_shift || button == ui->button_ok_num) {
-        if (ui->topOSK->currentIndex() == 1) {
-            emit SubmitNormalText(SwkbdResult::Ok,
-                                  ui->text_edit_osk->toPlainText().toStdU16String());
-        } else {
-            emit SubmitNormalText(SwkbdResult::Ok, ui->line_edit_osk->text().toStdU16String());
-        }
+        auto text = ui->topOSK->currentIndex() == 1
+                        ? ui->text_edit_osk->toPlainText().toStdU16String()
+                        : ui->line_edit_osk->text().toStdU16String();
+
+        emit SubmitNormalText(SwkbdResult::Ok, std::move(text));
         return;
     }
 
@@ -1277,13 +1264,11 @@ void QtSoftwareKeyboardDialog::TranslateButtonPress(HIDButton button) {
         if (is_inline) {
             emit SubmitInlineText(SwkbdReplyType::DecidedCancel, current_text, cursor_position);
         } else {
-            if (ui->topOSK->currentIndex() == 1) {
-                emit SubmitNormalText(SwkbdResult::Cancel,
-                                      ui->text_edit_osk->toPlainText().toStdU16String());
-            } else {
-                emit SubmitNormalText(SwkbdResult::Cancel,
-                                      ui->line_edit_osk->text().toStdU16String());
-            }
+            auto text = ui->topOSK->currentIndex() == 1
+                            ? ui->text_edit_osk->toPlainText().toStdU16String()
+                            : ui->line_edit_osk->text().toStdU16String();
+
+            emit SubmitNormalText(SwkbdResult::Cancel, std::move(text));
         }
         break;
     case HIDButton::Y:
@@ -1575,7 +1560,7 @@ void QtSoftwareKeyboard::ShowNormalKeyboard() const {
 void QtSoftwareKeyboard::ShowTextCheckDialog(
     Service::AM::Applets::SwkbdTextCheckResult text_check_result,
     std::u16string text_check_message) const {
-    emit MainWindowShowTextCheckDialog(text_check_result, text_check_message);
+    emit MainWindowShowTextCheckDialog(text_check_result, std::move(text_check_message));
 }
 
 void QtSoftwareKeyboard::ShowInlineKeyboard(
