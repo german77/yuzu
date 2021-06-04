@@ -14,7 +14,9 @@
 
 namespace TasInput {
 
-using TasAnalog = std::tuple<float, float>;
+using TasAnalog = std::pair<float, float>;
+using TasMotion= std::tuple<Common::Vec3f, Common::Vec3f>;
+
 
 enum class TasButton {
     BUTTON_A = 0x000001,
@@ -70,9 +72,17 @@ enum class TasAxes : u8 {
     Undefined,
 };
 
+enum class TasMotions : u8 {
+    LeftJoycon,
+    RightJoycon,
+    Console,
+    Undefined,
+};
+
 struct TasData {
     u32 buttons{};
     std::array<float, 4> axis{};
+    std::array<Input::MotionStatus, 2> motions{};
 };
 
 class Tas {
@@ -82,12 +92,14 @@ public:
 
     void RefreshTasFile();
     void LoadTasFile();
-    void RecordInput(u32 buttons, std::array<std::pair<float, float>, 2> axes);
+    void RecordInput(u32 buttons, std::array<TasAnalog, 2> axes,
+                     std::array<Input::MotionStatus, 2> motions);
     void UpdateThread();
     std::string GetStatusDescription();
 
     InputCommon::ButtonMapping GetButtonMappingForDevice(const Common::ParamPackage& params) const;
     InputCommon::AnalogMapping GetAnalogMappingForDevice(const Common::ParamPackage& params) const;
+    InputCommon::MotionMapping GetMotionMappingForDevice(const Common::ParamPackage& params) const;
     [[nodiscard]] TasData& GetTasState(std::size_t pad);
     [[nodiscard]] const TasData& GetTasState(std::size_t pad) const;
 
@@ -96,12 +108,18 @@ private:
         u32 buttons{};
         TasAnalog l_axis{};
         TasAnalog r_axis{};
+        TasMotion l_motion{};
+        TasMotion r_motion{};
     };
     void WriteTasFile();
     TasAnalog ReadCommandAxis(const std::string line) const;
     u32 ReadCommandButtons(const std::string line) const;
-    std::string WriteCommandButtons(u32 data) const;
+    Common::Vec3f ReadCommandGyroMotion(const std::string line) const;
+    Common::Vec3f ReadCommandAccelMotion(const std::string line) const;
     std::string WriteCommandAxis(TasAnalog data) const;
+    std::string WriteCommandButtons(u32 data) const;
+    std::string WriteCommandGyroMotion(TasMotion data) const;
+    std::string WriteCommandAccelMotion(TasMotion data) const;
     std::pair<float, float> flipY(std::pair<float, float> old) const;
 
     std::array<TasData, 7> tas_data;

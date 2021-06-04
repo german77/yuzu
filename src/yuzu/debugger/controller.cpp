@@ -6,11 +6,10 @@
 #include <QLayout>
 #include <QString>
 #include "common/settings.h"
-#include "yuzu/configuration/configure_input_player_widget.h"
-#include "yuzu/debugger/controller.h"
 #include "input_common/main.h"
 #include "input_common/tas/tas_input.h"
-
+#include "yuzu/configuration/configure_input_player_widget.h"
+#include "yuzu/debugger/controller.h"
 
 ControllerDialog::ControllerDialog(QWidget* parent, InputCommon::InputSubsystem* input_subsystem_)
     : QWidget(parent, Qt::Dialog), input_subsystem{input_subsystem_} {
@@ -43,7 +42,8 @@ ControllerDialog::ControllerDialog(QWidget* parent, InputCommon::InputSubsystem*
 void ControllerDialog::refreshConfiguration() {
     const auto& players = Settings::values.players.GetValue();
     constexpr std::size_t player = 0;
-    widget->SetPlayerInputRaw(player, players[player].buttons, players[player].analogs);
+    widget->SetPlayerInputRaw(player, players[player].buttons, players[player].analogs,
+                              players[player].motions);
     widget->SetConnectedStatus(players[player].connected);
     widget->SetControllerType(players[player].controller_type);
     ControllerCallback callback{[this](ControllerInput input) { InputController(input); }};
@@ -87,5 +87,5 @@ void ControllerDialog::InputController(ControllerInput input) {
         buttons += (btn ? 1 : 0) << index;
         index++;
     }
-    input_subsystem->GetTas()->RecordInput(buttons, input.axis_values);
+    input_subsystem->GetTas()->RecordInput(buttons, input.axis_values, input.motion_values);
 }

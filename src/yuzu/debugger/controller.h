@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <QWidget>
 #include <QFileSystemWatcher>
+#include <QWidget>
 #include "common/settings.h"
 
 class QAction;
@@ -20,6 +20,7 @@ class InputSubsystem;
 struct ControllerInput {
     std::array<std::pair<float, float>, Settings::NativeAnalog::NUM_STICKS_HID> axis_values{};
     std::array<bool, Settings::NativeButton::NumButtons> button_values{};
+    std::array<Input::MotionStatus, Settings::NativeMotion::NUM_MOTIONS_HID> motion_values{};
     bool changed{};
 };
 

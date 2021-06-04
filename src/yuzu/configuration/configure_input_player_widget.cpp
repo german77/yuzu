@@ -20,13 +20,17 @@ PlayerControlPreview::PlayerControlPreview(QWidget* parent) : QFrame(parent) {
 PlayerControlPreview::~PlayerControlPreview() = default;
 
 void PlayerControlPreview::SetPlayerInput(std::size_t index, const ButtonParam& buttons_param,
-                                          const AnalogParam& analogs_param) {
+                                          const AnalogParam& analogs_param,
+                                          const MotionParam& motions_param) {
     player_index = index;
     Settings::ButtonsRaw buttonss;
     Settings::AnalogsRaw analogs;
+    Settings::MotionsRaw motionss;
     std::transform(buttons_param.begin(), buttons_param.end(), buttonss.begin(),
                    [](const Common::ParamPackage& param) { return param.Serialize(); });
     std::transform(analogs_param.begin(), analogs_param.end(), analogs.begin(),
+                   [](const Common::ParamPackage& param) { return param.Serialize(); });
+    std::transform(analogs_param.begin(), analogs_param.end(), motionss.begin(),
                    [](const Common::ParamPackage& param) { return param.Serialize(); });
 
     std::transform(buttonss.begin() + Settings::NativeButton::BUTTON_HID_BEGIN,
@@ -35,11 +39,16 @@ void PlayerControlPreview::SetPlayerInput(std::size_t index, const ButtonParam& 
     std::transform(analogs.begin() + Settings::NativeAnalog::STICK_HID_BEGIN,
                    analogs.begin() + Settings::NativeAnalog::STICK_HID_END, sticks.begin(),
                    Input::CreateDevice<Input::AnalogDevice>);
+    std::transform(motionss.begin() + Settings::NativeMotion::MOTION_HID_BEGIN,
+                   motionss.begin() + Settings::NativeMotion::MOTION_HID_END, motions.begin(),
+                   Input::CreateDevice<Input::MotionDevice>);
     UpdateColors();
 }
+
 void PlayerControlPreview::SetPlayerInputRaw(std::size_t index,
                                              const Settings::ButtonsRaw& buttons_,
-                                             Settings::AnalogsRaw analogs_) {
+                                             const Settings::AnalogsRaw& analogs_,
+                                             const Settings::MotionsRaw& motions_) {
     player_index = index;
     std::transform(buttons_.begin() + Settings::NativeButton::BUTTON_HID_BEGIN,
                    buttons_.begin() + Settings::NativeButton::BUTTON_NS_END, buttons.begin(),
@@ -47,6 +56,9 @@ void PlayerControlPreview::SetPlayerInputRaw(std::size_t index,
     std::transform(analogs_.begin() + Settings::NativeAnalog::STICK_HID_BEGIN,
                    analogs_.begin() + Settings::NativeAnalog::STICK_HID_END, sticks.begin(),
                    Input::CreateDevice<Input::AnalogDevice>);
+    std::transform(motions_.begin() + Settings::NativeMotion::MOTION_HID_BEGIN,
+                   motions_.begin() + Settings::NativeMotion::MOTION_HID_END, motions.begin(),
+                   Input::CreateDevice<Input::MotionDevice>);
     UpdateColors();
 }
 
@@ -199,6 +211,13 @@ void PlayerControlPreview::UpdateInput() {
         }
     }
 
+    if (Settings::values.motion_enabled.GetValue()) {
+        const auto& motion_state = motions;
+        for (std::size_t index = 0; index < motion_values.size(); ++index) {
+            motion_values[index] = motion_state[index]->GetStatus();
+        }
+    }
+
     ControllerInput input{};
     if (input_changed) {
         update();
@@ -211,6 +230,7 @@ void PlayerControlPreview::UpdateInput() {
         axis_values[Settings::NativeAnalog::RStick].value.x(),
         axis_values[Settings::NativeAnalog::RStick].value.y()};
     input.button_values = button_values;
+    input.motion_values = motion_values;
     if (controller_callback.input != NULL) {
         controller_callback.input(std::move(input));
     }

@@ -15,6 +15,7 @@ class QLabel;
 
 using AnalogParam = std::array<Common::ParamPackage, Settings::NativeAnalog::NumAnalogs>;
 using ButtonParam = std::array<Common::ParamPackage, Settings::NativeButton::NumButtons>;
+using MotionParam = std::array<Common::ParamPackage, Settings::NativeMotion::NumMotions>;
 
 // Widget for representing controller animations
 class PlayerControlPreview : public QFrame {
@@ -34,9 +35,9 @@ public:
     ~PlayerControlPreview() override;
 
     void SetPlayerInput(std::size_t index, const ButtonParam& buttons_param,
-                        const AnalogParam& analogs_param);
+                        const AnalogParam& analogs_param , const MotionParam& motions_param);
     void SetPlayerInputRaw(std::size_t index, const Settings::ButtonsRaw& buttons_,
-                           Settings::AnalogsRaw analogs_);
+                           const Settings::AnalogsRaw& analogs_, const Settings::MotionsRaw& motions_);
     void SetConnectedStatus(bool checked);
     void SetControllerType(Settings::ControllerType type);
     void BeginMappingButton(std::size_t button_id);
@@ -177,6 +178,8 @@ private:
         std::array<std::unique_ptr<Input::ButtonDevice>, Settings::NativeButton::BUTTON_NS_END>;
     using StickArray =
         std::array<std::unique_ptr<Input::AnalogDevice>, Settings::NativeAnalog::NUM_STICKS_HID>;
+    using MotionArray =
+        std::array<std::unique_ptr<Input::MotionDevice>, Settings::NativeMotion::NUM_MOTIONS_HID>;
 
     ControllerCallback controller_callback;
     bool mapping_active{};
@@ -186,10 +189,12 @@ private:
     std::array<QColor, 4> led_color{};
     ButtonArray buttons{};
     StickArray sticks{};
+    MotionArray motions{};
     std::size_t player_index{};
     std::size_t button_mapping_index{Settings::NativeButton::BUTTON_NS_END};
     std::size_t analog_mapping_index{Settings::NativeAnalog::NUM_STICKS_HID};
     std::array<AxisValue, Settings::NativeAnalog::NUM_STICKS_HID> axis_values{};
     std::array<bool, Settings::NativeButton::NumButtons> button_values{};
+    std::array<Input::MotionStatus, Settings::NativeMotion::NUM_MOTIONS_HID> motion_values{};
     Settings::ControllerType controller_type{Settings::ControllerType::ProController};
 };

@@ -68,6 +68,8 @@ struct InputSubsystem::Impl {
         Input::RegisterFactory<Input::ButtonDevice>("tas", tasbuttons);
         tasanalog = std::make_shared<TasAnalogFactory>(tas);
         Input::RegisterFactory<Input::AnalogDevice>("tas", tasanalog);
+        tasmotion = std::make_shared<TasMotionFactory>(tas);
+        Input::RegisterFactory<Input::MotionDevice>("tas", tasmotion);
     }
 
     void Shutdown() {
@@ -105,9 +107,11 @@ struct InputSubsystem::Impl {
 
         Input::UnregisterFactory<Input::ButtonDevice>("tas");
         Input::UnregisterFactory<Input::AnalogDevice>("tas");
+        Input::UnregisterFactory<Input::MotionDevice>("tas");
 
         tasbuttons.reset();
         tasanalog.reset();
+        tasmotion.reset();
     }
 
     [[nodiscard]] std::vector<Common::ParamPackage> GetInputDevices() const {
@@ -174,6 +178,9 @@ struct InputSubsystem::Impl {
             // TODO return the correct motion device
             return {};
         }
+        if (params.Get("class", "") == "tas") {
+            return tas->GetMotionMappingForDevice(params);
+        }
 #ifdef HAVE_SDL2
         if (params.Get("class", "") == "sdl") {
             return sdl->GetMotionMappingForDevice(params);
@@ -197,6 +204,7 @@ struct InputSubsystem::Impl {
     std::shared_ptr<MouseTouchFactory> mousetouch;
     std::shared_ptr<TasButtonFactory> tasbuttons;
     std::shared_ptr<TasAnalogFactory> tasanalog;
+    std::shared_ptr<TasMotionFactory> tasmotion;
     std::shared_ptr<CemuhookUDP::Client> udp;
     std::shared_ptr<GCAdapter::Adapter> gcadapter;
     std::shared_ptr<MouseInput::Mouse> mouse;

@@ -78,6 +78,15 @@ namespace TasInput {
                 .l_axis = ReadCommandAxis(seglist.at(2)),
                 .r_axis = ReadCommandAxis(seglist.at(3)),
             };
+
+            if (seglist.size() == 8) {
+                command.l_motion = {ReadCommandGyroMotion(seglist.at(4)),
+                                    ReadCommandAccelMotion(seglist.at(5))};
+                command.r_motion = {ReadCommandGyroMotion(seglist.at(6)),
+                                    ReadCommandAccelMotion(seglist.at(7))};
+                newCommands.push_back(command);
+            }
+
             newCommands.push_back(command);
             frameNo++;
         }
@@ -91,15 +100,23 @@ namespace TasInput {
             if (!output_text.empty())
                 output_text += "\n";
             TASCommand line = recordCommands.at(frame);
-            output_text += std::to_string(frame) + " " + WriteCommandButtons(line.buttons) + " " + WriteCommandAxis(line.l_axis) + " " + WriteCommandAxis(line.r_axis);
+            output_text += std::to_string(frame) + " " + WriteCommandButtons(line.buttons) + " " +
+                           WriteCommandAxis(line.l_axis) + " " + WriteCommandAxis(line.r_axis) +
+                           " " + WriteCommandGyroMotion(line.l_motion) + " " +
+                           WriteCommandAccelMotion(line.l_motion) + " " +
+                           WriteCommandGyroMotion(line.r_motion) + " " +
+                           WriteCommandAccelMotion(line.r_motion);
         }
         std::size_t file_bytes = Common::FS::WriteStringToFile(
             Settings::values.tas_path, Common::FS::FileType::TextFile, output_text);
         LOG_INFO(Input, "TAS file written to file! {} bytes written", file_bytes);
     }
 
-    void Tas::RecordInput(u32 buttons, std::array<std::pair<float, float>, 2> axes) {
-        lastInput = {buttons, flipY(axes[0]), flipY(axes[1])};
+    void Tas::RecordInput(u32 buttons, std::array<TasAnalog, 2> axes,
+                          std::array<Input::MotionStatus, 2> motions) {
+        TasMotion left_motion = {std::get<1>(motions[0]), std::get<0>(motions[0])};
+        TasMotion right_motion = {std::get<1>(motions[1]), std::get<0>(motions[1])};
+        lastInput = {buttons, flipY(axes[0]), flipY(axes[1]), left_motion, right_motion};
     }
 
     std::pair<float, float> Tas::flipY(std::pair<float, float> old) const {
@@ -122,6 +139,7 @@ namespace TasInput {
             if (Settings::values.pauseTasOnLoad && Settings::values.cpuBoosted) {
                 tas_data[0].buttons = 0;
                 tas_data[0].axis = {};
+                tas_data[0].motions = {};
             }
 
             if (Settings::values.tas_record) {
@@ -154,6 +172,11 @@ namespace TasInput {
                     auto [r_axis_x, r_axis_y] = command.r_axis;
                     tas_data[0].axis[2] = r_axis_x;
                     tas_data[0].axis[3] = r_axis_y;
+
+                    auto [l_gyro, l_accel] = command.l_motion;
+                    tas_data[0].motions[0] = {l_accel, l_gyro, {}, {}, {}};
+                    auto [r_gyro, r_accel] = command.r_motion;
+                    tas_data[0].motions[1] = {r_accel, r_gyro, {}, {}, {}};
                 } else {
                     Settings::values.tas_enable = false;
                     current_command = 0;
@@ -179,7 +202,7 @@ namespace TasInput {
         const float x = std::stof(seglist.at(0)) / 32767.f;
         const float y = std::stof(seglist.at(1)) / 32767.f;
 
-        return { x, y };
+        return {x, y};
     }
 
     u32 Tas::ReadCommandButtons(const std::string data) const {
@@ -195,6 +218,36 @@ namespace TasInput {
             }
         }
         return buttons;
+    }
+
+    Common::Vec3f Tas::ReadCommandGyroMotion(const std::string line) const {
+        std::stringstream linestream(line);
+        std::string segment;
+        std::vector<std::string> seglist;
+
+        while (std::getline(linestream, segment, ';')) {
+            seglist.push_back(segment);
+        }
+
+        const float g_x = std::stof(seglist.at(0)) / 2048.f;
+        const float g_y = std::stof(seglist.at(1)) / 2048.f;
+        const float g_z = std::stof(seglist.at(2)) / 2048.f;
+        return {g_x, g_y, g_z};
+    }
+
+    Common::Vec3f Tas::ReadCommandAccelMotion(const std::string line) const {
+        std::stringstream linestream(line);
+        std::string segment;
+        std::vector<std::string> seglist;
+
+        while (std::getline(linestream, segment, ';')) {
+            seglist.push_back(segment);
+        }
+
+        const float a_x = std::stof(seglist.at(0)) / 2048.f;
+        const float a_y = std::stof(seglist.at(1)) / 2048.f;
+        const float a_z = std::stof(seglist.at(2)) / 2048.f;
+        return {a_x, a_y, a_z};
     }
 
     std::string Tas::WriteCommandAxis(TasAnalog data) const {
@@ -226,6 +279,28 @@ namespace TasInput {
             index++;
             data >>= 1;
         }
+        return line;
+    }
+
+    std::string Tas::WriteCommandGyroMotion(TasMotion data) const {
+        auto [gyro, accel] = data;
+        std::string line;
+        line += std::to_string(static_cast<int>(gyro.x * 2048));
+        line += ";";
+        line += std::to_string(static_cast<int>(gyro.y * 2048));
+        line += ";";
+        line += std::to_string(static_cast<int>(gyro.z * 2048));
+        return line;
+    }
+
+    std::string Tas::WriteCommandAccelMotion(TasMotion data) const {
+        auto [gyro, accel] = data;
+        std::string line;
+        line += std::to_string(static_cast<int>(accel.x * 2048));
+        line += ";";
+        line += std::to_string(static_cast<int>(accel.y * 2048));
+        line += ";";
+        line += std::to_string(static_cast<int>(accel.z * 2048));
         return line;
     }
 
@@ -288,6 +363,22 @@ namespace TasInput {
         return mapping;
     }
 
+    InputCommon::MotionMapping Tas::GetMotionMappingForDevice(const Common::ParamPackage& params) const{
+        InputCommon::MotionMapping mapping = {};
+        Common::ParamPackage left_motion_params;
+        left_motion_params.Set("engine", "tas");
+        left_motion_params.Set("pad", params.Get("pad", 0));
+        left_motion_params.Set("motion", static_cast<int>(TasMotions::LeftJoycon));
+        mapping.insert_or_assign(Settings::NativeMotion::MotionLeft, std::move(left_motion_params));
+        Common::ParamPackage right_motion_params;
+        right_motion_params.Set("engine", "tas");
+        right_motion_params.Set("pad", params.Get("pad", 0));
+        right_motion_params.Set("motion", static_cast<int>(TasMotions::RightJoycon));
+        mapping.insert_or_assign(Settings::NativeMotion::MotionRight,
+                                 std::move(right_motion_params));
+
+        return mapping;
+    }
     TasData& Tas::GetTasState(std::size_t pad) {
         return tas_data[pad];
     }

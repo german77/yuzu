@@ -70,6 +70,7 @@ class MouseMotionFactory;
 class MouseTouchFactory;
 class TasButtonFactory;
 class TasAnalogFactory;
+class TasMotionFactory;
 class Keyboard;
 
 /**
@@ -185,11 +186,17 @@ public:
     /// Retrieves the underlying tas button handler.
     [[nodiscard]] const TasButtonFactory* GetTasButtons() const;
 
-    /// Retrieves the underlying tas touch handler.
+    /// Retrieves the underlying tas analog handler.
     [[nodiscard]] TasAnalogFactory* GetTasAnalogs();
 
-    /// Retrieves the underlying tas touch handler.
+    /// Retrieves the underlying tas analog handler.
     [[nodiscard]] const TasAnalogFactory* GetTasAnalogs() const;
+
+    /// Retrieves the underlying tas motion handler.
+    [[nodiscard]] TasMotionFactory* GetTasMotions();
+
+    /// Retrieves the underlying tas motion handler.
+    [[nodiscard]] const TasMotionFactory* GetTasMotions() const;
 
     /// Reloads the input devices
     void ReloadInputDevices();

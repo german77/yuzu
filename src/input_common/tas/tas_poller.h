@@ -10,34 +10,42 @@
 
 namespace InputCommon {
 
+/// A button device factory that creates button devices from TAS
+class TasButtonFactory final : public Input::Factory<Input::ButtonDevice> {
+public:
+    explicit TasButtonFactory(std::shared_ptr<TasInput::Tas> tas_input_);
+
     /**
-     * A button device factory representing a mouse. It receives mouse events and forward them
-     * to all button devices it created.
+     * Creates a button device from a button press
+     * @param params contains parameters for creating the device:
+     *     - "code": the code of the key to bind with the button
      */
-    class TasButtonFactory final : public Input::Factory<Input::ButtonDevice> {
-    public:
-        explicit TasButtonFactory(std::shared_ptr<TasInput::Tas> tas_input_);
+    std::unique_ptr<Input::ButtonDevice> Create(const Common::ParamPackage& params) override;
 
-        /**
-         * Creates a button device from a button press
-         * @param params contains parameters for creating the device:
-         *     - "code": the code of the key to bind with the button
-         */
-        std::unique_ptr<Input::ButtonDevice> Create(const Common::ParamPackage& params) override;
+private:
+    std::shared_ptr<TasInput::Tas> tas_input;
+};
 
-    private:
-        std::shared_ptr<TasInput::Tas> tas_input;
-    };
+/// An analog device factory that creates analog devices from TAS
+class TasAnalogFactory final : public Input::Factory<Input::AnalogDevice> {
+public:
+    explicit TasAnalogFactory(std::shared_ptr<TasInput::Tas> tas_input_);
 
-    /// An analog device factory that creates analog devices from mouse
-    class TasAnalogFactory final : public Input::Factory<Input::AnalogDevice> {
-    public:
-        explicit TasAnalogFactory(std::shared_ptr<TasInput::Tas> tas_input_);
+    std::unique_ptr<Input::AnalogDevice> Create(const Common::ParamPackage& params) override;
 
-        std::unique_ptr<Input::AnalogDevice> Create(const Common::ParamPackage& params) override;
+private:
+    std::shared_ptr<TasInput::Tas> tas_input;
+};
 
-    private:
-        std::shared_ptr<TasInput::Tas> tas_input;
-    };
+/// A motion device factory that creates motion devices from TAS
+class TasMotionFactory final : public Input::Factory<Input::MotionDevice> {
+public:
+    explicit TasMotionFactory(std::shared_ptr<TasInput::Tas> tas_input_);
+
+    std::unique_ptr<Input::MotionDevice> Create(const Common::ParamPackage& params) override;
+
+private:
+    std::shared_ptr<TasInput::Tas> tas_input;
+};
 
 } // namespace InputCommon

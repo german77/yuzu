@@ -134,6 +134,11 @@ QString ButtonToText(const Common::ParamPackage& param) {
             const QString button_str = QString::number(int(std::log2(param.Get("button", 0))));
             return QObject::tr("TAS Btn %1").arg(button_str);
         }
+
+        if (param.Has("motion")) {
+            const QString motion_str = QString::number(int(param.Get("motion", 0)));
+            return QObject::tr("TAS Mtn %1").arg(motion_str);
+        }
         return GetKeyName(param.Get("code", 0));
     }
 
@@ -328,7 +333,8 @@ ConfigureInputPlayer::ConfigureInputPlayer(QWidget* parent, std::size_t player_i
                         button_map[button_id]->setText(ButtonToText(buttons_param[button_id]));
                     });
                     context_menu.exec(button_map[button_id]->mapToGlobal(menu_location));
-                    ui->controllerFrame->SetPlayerInput(player_index, buttons_param, analogs_param);
+                    ui->controllerFrame->SetPlayerInput(player_index, buttons_param, analogs_param,
+                                                        motions_param);
                 });
     }
 
@@ -387,37 +393,37 @@ ConfigureInputPlayer::ConfigureInputPlayer(QWidget* parent, std::size_t player_i
 
             analog_button->setContextMenuPolicy(Qt::CustomContextMenu);
 
-            connect(
-                analog_button, &QPushButton::customContextMenuRequested,
-                [=, this](const QPoint& menu_location) {
-                    QMenu context_menu;
-                    context_menu.addAction(tr("Clear"), [&] {
-                        analogs_param[analog_id].Clear();
-                        analog_map_buttons[analog_id][sub_button_id]->setText(tr("[not set]"));
+            connect(analog_button, &QPushButton::customContextMenuRequested,
+                    [=, this](const QPoint& menu_location) {
+                        QMenu context_menu;
+                        context_menu.addAction(tr("Clear"), [&] {
+                            analogs_param[analog_id].Clear();
+                            analog_map_buttons[analog_id][sub_button_id]->setText(tr("[not set]"));
+                        });
+                        context_menu.addAction(tr("Invert axis"), [&] {
+                            if (sub_button_id == 2 || sub_button_id == 3) {
+                                const bool invert_value =
+                                    analogs_param[analog_id].Get("invert_x", "+") == "-";
+                                const std::string invert_str = invert_value ? "+" : "-";
+                                analogs_param[analog_id].Set("invert_x", invert_str);
+                            }
+                            if (sub_button_id == 0 || sub_button_id == 1) {
+                                const bool invert_value =
+                                    analogs_param[analog_id].Get("invert_y", "+") == "-";
+                                const std::string invert_str = invert_value ? "+" : "-";
+                                analogs_param[analog_id].Set("invert_y", invert_str);
+                            }
+                            for (int sub_button_id = 0; sub_button_id < ANALOG_SUB_BUTTONS_NUM;
+                                 ++sub_button_id) {
+                                analog_map_buttons[analog_id][sub_button_id]->setText(AnalogToText(
+                                    analogs_param[analog_id], analog_sub_buttons[sub_button_id]));
+                            }
+                        });
+                        context_menu.exec(analog_map_buttons[analog_id][sub_button_id]->mapToGlobal(
+                            menu_location));
+                        ui->controllerFrame->SetPlayerInput(player_index, buttons_param,
+                                                            analogs_param, motions_param);
                     });
-                    context_menu.addAction(tr("Invert axis"), [&] {
-                        if (sub_button_id == 2 || sub_button_id == 3) {
-                            const bool invert_value =
-                                analogs_param[analog_id].Get("invert_x", "+") == "-";
-                            const std::string invert_str = invert_value ? "+" : "-";
-                            analogs_param[analog_id].Set("invert_x", invert_str);
-                        }
-                        if (sub_button_id == 0 || sub_button_id == 1) {
-                            const bool invert_value =
-                                analogs_param[analog_id].Get("invert_y", "+") == "-";
-                            const std::string invert_str = invert_value ? "+" : "-";
-                            analogs_param[analog_id].Set("invert_y", invert_str);
-                        }
-                        for (int sub_button_id = 0; sub_button_id < ANALOG_SUB_BUTTONS_NUM;
-                             ++sub_button_id) {
-                            analog_map_buttons[analog_id][sub_button_id]->setText(AnalogToText(
-                                analogs_param[analog_id], analog_sub_buttons[sub_button_id]));
-                        }
-                    });
-                    context_menu.exec(
-                        analog_map_buttons[analog_id][sub_button_id]->mapToGlobal(menu_location));
-                    ui->controllerFrame->SetPlayerInput(player_index, buttons_param, analogs_param);
-                });
         }
 
         // Handle clicks for the modifier buttons as well.
@@ -456,14 +462,16 @@ ConfigureInputPlayer::ConfigureInputPlayer(QWidget* parent, std::size_t player_i
                 [=, this] {
                     const auto spinbox_value = analog_map_range_spinbox[analog_id]->value();
                     analogs_param[analog_id].Set("range", spinbox_value / 100.0f);
-                    ui->controllerFrame->SetPlayerInput(player_index, buttons_param, analogs_param);
+                    ui->controllerFrame->SetPlayerInput(player_index, buttons_param, analogs_param,
+                                                        motions_param);
                 });
 
         connect(analog_map_deadzone_slider[analog_id], &QSlider::valueChanged, [=, this] {
             const auto slider_value = analog_map_deadzone_slider[analog_id]->value();
             analog_map_deadzone_label[analog_id]->setText(tr("Deadzone: %1%").arg(slider_value));
             analogs_param[analog_id].Set("deadzone", slider_value / 100.0f);
-            ui->controllerFrame->SetPlayerInput(player_index, buttons_param, analogs_param);
+            ui->controllerFrame->SetPlayerInput(player_index, buttons_param, analogs_param,
+                                                motions_param);
         });
 
         connect(analog_map_modifier_slider[analog_id], &QSlider::valueChanged, [=, this] {
@@ -598,7 +606,7 @@ ConfigureInputPlayer::ConfigureInputPlayer(QWidget* parent, std::size_t player_i
             &ConfigureInputPlayer::SaveProfile);
 
     LoadConfiguration();
-    ui->controllerFrame->SetPlayerInput(player_index, buttons_param, analogs_param);
+    ui->controllerFrame->SetPlayerInput(player_index, buttons_param, analogs_param, motions_param);
     ui->controllerFrame->SetConnectedStatus(ui->groupConnectedController->isChecked());
 }
 
@@ -922,7 +930,8 @@ void ConfigureInputPlayer::UpdateUI() {
         modifier_label->setVisible(!is_controller);
         modifier_slider->setVisible(!is_controller);
         range_groupbox->setVisible(is_controller);
-        ui->controllerFrame->SetPlayerInput(player_index, buttons_param, analogs_param);
+        ui->controllerFrame->SetPlayerInput(player_index, buttons_param, analogs_param,
+                                            motions_param);
     }
 }
 
