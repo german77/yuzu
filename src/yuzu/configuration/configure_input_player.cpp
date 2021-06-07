@@ -1376,6 +1376,7 @@ void ConfigureInputPlayer::mousePressEvent(QMouseEvent* event) {
 }
 
 void ConfigureInputPlayer::keyPressEvent(QKeyEvent* event) {
+    event->ignore();
     if (!input_setter || !event) {
         return;
     }
@@ -1389,7 +1390,6 @@ void ConfigureInputPlayer::keyPressEvent(QKeyEvent* event) {
             return;
         }
     }
-
     SetPollingResult({}, true);
 }
 

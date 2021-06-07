@@ -86,6 +86,7 @@ namespace NativeMotion {
 enum Values : int {
     MotionLeft,
     MotionRight,
+//    MotionConsole,
 
     NumMotions,
 };

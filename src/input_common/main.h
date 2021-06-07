@@ -178,6 +178,7 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> impl;
+
 };
 
 /// Generates a serialized param package for creating a keyboard button device

@@ -11,6 +11,7 @@
 #include "common/quaternion.h"
 #include "common/settings.h"
 #include "core/frontend/input.h"
+#include "input_common/controller.h"
 #include "core/hle/service/hid/controllers/controller_base.h"
 
 namespace Kernel {
@@ -551,9 +552,6 @@ private:
 
     NpadStyleSet style{};
     std::array<NPadEntry, 10> shared_memory_entries{};
-    using ButtonArray = std::array<
-        std::array<std::unique_ptr<Input::ButtonDevice>, Settings::NativeButton::NUM_BUTTONS_HID>,
-        10>;
     using StickArray = std::array<
         std::array<std::unique_ptr<Input::AnalogDevice>, Settings::NativeAnalog::NUM_STICKS_HID>,
         10>;
@@ -563,7 +561,8 @@ private:
     using MotionArray = std::array<
         std::array<std::unique_ptr<Input::MotionDevice>, Settings::NativeMotion::NUM_MOTIONS_HID>,
         10>;
-    ButtonArray buttons;
+
+    std::array<std::unique_ptr<Input::ControllerInputDevice>,10> controllers;
     StickArray sticks;
     VibrationArray vibrations;
     MotionArray motions;

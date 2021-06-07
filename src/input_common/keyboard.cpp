@@ -75,7 +75,7 @@ public:
                 } else {
                     pair.key_button->UnlockButton();
                 }
-                pair.key_button->TriggerOnChange();
+                pair.key_button->TriggerOnChange(pressed);
             }
         }
     }

@@ -315,9 +315,8 @@ void Controller_NPad::OnInit() {
 void Controller_NPad::OnLoadInputDevices() {
     const auto& players = Settings::values.players.GetValue();
     for (std::size_t i = 0; i < players.size(); ++i) {
-        std::transform(players[i].buttons.begin() + Settings::NativeButton::BUTTON_HID_BEGIN,
-                       players[i].buttons.begin() + Settings::NativeButton::BUTTON_HID_END,
-                       buttons[i].begin(), Input::CreateDevice<Input::ButtonDevice>);
+        controllers[i] =
+            Input::CreateDevice<Input::ControllerInputDevice>("engine:player");
         std::transform(players[i].analogs.begin() + Settings::NativeAnalog::STICK_HID_BEGIN,
                        players[i].analogs.begin() + Settings::NativeAnalog::STICK_HID_END,
                        sticks[i].begin(), Input::CreateDevice<Input::AnalogDevice>);
@@ -357,7 +356,7 @@ void Controller_NPad::RequestPadStateUpdate(u32 npad_id) {
     auto& lstick_entry = npad_pad_states[controller_idx].l_stick;
     auto& rstick_entry = npad_pad_states[controller_idx].r_stick;
     auto& trigger_entry = npad_trigger_states[controller_idx];
-    const auto& button_state = buttons[controller_idx];
+    const auto& button_state = controllers[controller_idx]->GetButtonStatus();
     const auto& analog_state = sticks[controller_idx];
     const auto [stick_l_x_f, stick_l_y_f] =
         analog_state[static_cast<std::size_t>(JoystickId::Joystick_Left)]->GetStatus();
@@ -366,14 +365,14 @@ void Controller_NPad::RequestPadStateUpdate(u32 npad_id) {
 
     using namespace Settings::NativeButton;
     if (controller_type != NPadControllerType::JoyLeft) {
-        pad_state.a.Assign(button_state[A - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.b.Assign(button_state[B - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.x.Assign(button_state[X - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.y.Assign(button_state[Y - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.r_stick.Assign(button_state[RStick - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.r.Assign(button_state[R - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.zr.Assign(button_state[ZR - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.plus.Assign(button_state[Plus - BUTTON_HID_BEGIN]->GetStatus());
+        pad_state.a.Assign(button_state[A]);
+        pad_state.b.Assign(button_state[B]);
+        pad_state.x.Assign(button_state[X]);
+        pad_state.y.Assign(button_state[Y]);
+        pad_state.r_stick.Assign(button_state[RStick ]);
+        pad_state.r.Assign(button_state[R]);
+        pad_state.zr.Assign(button_state[ZR]);
+        pad_state.plus.Assign(button_state[Plus]);
 
         pad_state.r_stick_right.Assign(
             analog_state[static_cast<std::size_t>(JoystickId::Joystick_Right)]
@@ -392,14 +391,14 @@ void Controller_NPad::RequestPadStateUpdate(u32 npad_id) {
     }
 
     if (controller_type != NPadControllerType::JoyRight) {
-        pad_state.d_left.Assign(button_state[DLeft - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.d_up.Assign(button_state[DUp - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.d_right.Assign(button_state[DRight - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.d_down.Assign(button_state[DDown - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.l_stick.Assign(button_state[LStick - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.l.Assign(button_state[L - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.zl.Assign(button_state[ZL - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.minus.Assign(button_state[Minus - BUTTON_HID_BEGIN]->GetStatus());
+        pad_state.d_left.Assign(button_state[DLeft - BUTTON_HID_BEGIN]);
+        pad_state.d_up.Assign(button_state[DUp - BUTTON_HID_BEGIN]);
+        pad_state.d_right.Assign(button_state[DRight - BUTTON_HID_BEGIN]);
+        pad_state.d_down.Assign(button_state[DDown - BUTTON_HID_BEGIN]);
+        pad_state.l_stick.Assign(button_state[LStick - BUTTON_HID_BEGIN]);
+        pad_state.l.Assign(button_state[L - BUTTON_HID_BEGIN]);
+        pad_state.zl.Assign(button_state[ZL - BUTTON_HID_BEGIN]);
+        pad_state.minus.Assign(button_state[Minus - BUTTON_HID_BEGIN]);
 
         pad_state.l_stick_right.Assign(
             analog_state[static_cast<std::size_t>(JoystickId::Joystick_Left)]
@@ -418,24 +417,24 @@ void Controller_NPad::RequestPadStateUpdate(u32 npad_id) {
     }
 
     if (controller_type == NPadControllerType::JoyLeft) {
-        pad_state.left_sl.Assign(button_state[SL - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.left_sr.Assign(button_state[SR - BUTTON_HID_BEGIN]->GetStatus());
+        pad_state.left_sl.Assign(button_state[SL - BUTTON_HID_BEGIN]);
+        pad_state.left_sr.Assign(button_state[SR - BUTTON_HID_BEGIN]);
     }
 
     if (controller_type == NPadControllerType::JoyRight) {
-        pad_state.right_sl.Assign(button_state[SL - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.right_sr.Assign(button_state[SR - BUTTON_HID_BEGIN]->GetStatus());
+        pad_state.right_sl.Assign(button_state[SL - BUTTON_HID_BEGIN]);
+        pad_state.right_sr.Assign(button_state[SR - BUTTON_HID_BEGIN]);
     }
 
     if (controller_type == NPadControllerType::GameCube) {
         trigger_entry.l_analog = static_cast<s32>(
-            button_state[ZL - BUTTON_HID_BEGIN]->GetStatus() ? HID_TRIGGER_MAX : 0);
+            button_state[ZL - BUTTON_HID_BEGIN] ? HID_TRIGGER_MAX : 0);
         trigger_entry.r_analog = static_cast<s32>(
-            button_state[ZR - BUTTON_HID_BEGIN]->GetStatus() ? HID_TRIGGER_MAX : 0);
+            button_state[ZR - BUTTON_HID_BEGIN] ? HID_TRIGGER_MAX : 0);
         pad_state.zl.Assign(false);
-        pad_state.zr.Assign(button_state[R - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.l.Assign(button_state[ZL - BUTTON_HID_BEGIN]->GetStatus());
-        pad_state.r.Assign(button_state[ZR - BUTTON_HID_BEGIN]->GetStatus());
+        pad_state.zr.Assign(button_state[R - BUTTON_HID_BEGIN]);
+        pad_state.l.Assign(button_state[ZL - BUTTON_HID_BEGIN]);
+        pad_state.r.Assign(button_state[ZR - BUTTON_HID_BEGIN]);
     }
 }
 

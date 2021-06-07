@@ -8,6 +8,7 @@
 #include "input_common/analog_from_button.h"
 #include "input_common/gcadapter/gc_adapter.h"
 #include "input_common/gcadapter/gc_poller.h"
+#include "input_common/controller.h"
 #include "input_common/keyboard.h"
 #include "input_common/main.h"
 #include "input_common/motion_from_button.h"
@@ -60,6 +61,10 @@ struct InputSubsystem::Impl {
         Input::RegisterFactory<Input::MotionDevice>("mouse", mousemotion);
         mousetouch = std::make_shared<MouseTouchFactory>(mouse);
         Input::RegisterFactory<Input::TouchDevice>("mouse", mousetouch);
+
+        controllers = std::make_shared<Controller>(0);
+        controllerpoller = std::make_shared<ControllerFactory>(controllers);
+        Input::RegisterFactory<Input::ControllerInputDevice>("player", controllerpoller);
     }
 
     void Shutdown() {
@@ -177,6 +182,8 @@ struct InputSubsystem::Impl {
     std::shared_ptr<CemuhookUDP::Client> udp;
     std::shared_ptr<GCAdapter::Adapter> gcadapter;
     std::shared_ptr<MouseInput::Mouse> mouse;
+    std::shared_ptr<Controller> controllers;
+    std::shared_ptr<ControllerFactory> controllerpoller;
 };
 
 InputSubsystem::InputSubsystem() : impl{std::make_unique<Impl>()} {}

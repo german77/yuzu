@@ -1,6 +1,8 @@
 add_library(input_common STATIC
     analog_from_button.cpp
     analog_from_button.h
+    controller.cpp
+    controller.h
     keyboard.cpp
     keyboard.h
     main.cpp

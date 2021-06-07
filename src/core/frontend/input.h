@@ -27,9 +27,36 @@ struct AnalogProperties {
     float range;
     float threshold;
 };
-template <typename StatusType>
+
+enum class InputType {
+    None,
+    Button,
+    Stick,
+    Analog,
+    Motion,
+    Touch,
+    Nfc,
+    Ir,
+};
+
+struct CallbackStatus {
+    InputType type{InputType::None};
+    bool button_value{};
+    float analog_value{};
+    std::tuple<float, float> stick_value{};
+    // MotionStatus motion_value{};
+    // TouchStatus touch_value{};
+
+    float deadzone{0.0f};
+    float threshold{0.5f};
+    float range{1.0f};
+    bool positive{true};
+    bool invert_x{false};
+    bool invert_y{false};
+};
+
 struct InputCallback {
-    std::function<void(StatusType)> on_change;
+    std::function<void(CallbackStatus)> on_change;
 };
 
 /// An abstract class template for an input device (a button, an analog input, etc.).
@@ -54,18 +81,53 @@ public:
                                [[maybe_unused]] f32 freq_high) const {
         return {};
     }
-    void SetCallback(InputCallback<StatusType> callback_) {
+    void SetCallback(InputCallback callback_) {
         callback = std::move(callback_);
     }
-    void TriggerOnChange() {
+
+    void TriggerOnChange(bool pressed) {
         if (callback.on_change) {
-            callback.on_change(GetStatus());
+            CallbackStatus cbk_status{};
+            cbk_status.type = InputType::Button;
+            cbk_status.button_value = pressed;
+            callback.on_change(cbk_status);
         }
     }
 
 private:
-    InputCallback<StatusType> callback;
+    InputCallback callback;
 };
+
+using ButtonValues = std::array<bool,20>;
+struct ControllerCallback {
+    std::function<void(ButtonValues)> buttons_on_change{};
+    //std::function<void(SticksValues)> stick_on_change{};
+    //std::function<void(TriggerValues)> trigger_on_change{};
+    //std::function<void(MotionValues)> motion_on_change{};
+    //std::function<void(TouchValues)> touch_on_change{};
+};
+
+class ControllerInputDevice {
+public:
+    virtual ~ControllerInputDevice() = default;
+    virtual ButtonValues GetButtonStatus() const {
+        return {};
+    }
+
+    void SetCallback(ControllerCallback callback_) {
+        callback = std::move(callback_);
+    }
+
+    void TriggerOnChange() {
+        if (callback.buttons_on_change) {
+            callback.buttons_on_change(GetButtonStatus());
+        }
+    }
+
+private:
+    ControllerCallback callback;
+};
+
 
 /// An abstract class template for a factory that can create input devices.
 template <typename InputDeviceType>
@@ -212,5 +274,19 @@ using TouchDevice = InputDevice<TouchStatus>;
  * The s32s are the mouse wheel.
  */
 using MouseDevice = InputDevice<std::tuple<float, float, s32, s32>>;
+
+using SticksValues = std::array<std::tuple<float, float>, 2>;
+using TriggerValues = std::array<std::tuple<float, bool>, 2>;
+using MotionValues = std::array<Input::MotionStatus, 2>;
+using TouchValues = Input::TouchStatus;
+
+struct ControllerStatus {
+    ButtonValues button_values{};
+    SticksValues stick_values{};
+    TriggerValues trigger_values{};
+    MotionValues motion_values{};
+    TouchValues touch_values{};
+};
+
 
 } // namespace Input
