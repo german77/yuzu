@@ -79,7 +79,7 @@ struct RegisterInfo {
     std::array<u8, 11> amiibo_name;
     INSERT_PADDING_BYTES(0x99);
 };
-// static_assert(sizeof(RegisterInfo) == 0x106, "RegisterInfo is an invalid size");
+static_assert(sizeof(RegisterInfo) == 0x100, "RegisterInfo is an invalid size");
 
 class IUser final : public ServiceFramework<IUser> {
 public:
