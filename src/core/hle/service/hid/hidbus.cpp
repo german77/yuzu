@@ -10,12 +10,12 @@
 #include "core/hle/kernel/k_event.h"
 #include "core/hle/kernel/k_readable_event.h"
 #include "core/hle/kernel/k_shared_memory.h"
+#include "core/hle/kernel/k_transfer_memory.h"
 #include "core/hle/kernel/k_writable_event.h"
 #include "core/hle/kernel/kernel.h"
-#include "core/hle/kernel/k_transfer_memory.h"
 #include "core/hle/service/hid/errors.h"
-#include "core/hle/service/hid/hidbus/ringcon.h"
 #include "core/hle/service/hid/hidbus.h"
+#include "core/hle/service/hid/hidbus/ringcon.h"
 #include "core/hle/service/service.h"
 
 namespace Service::HID {
@@ -67,14 +67,13 @@ HidBus::~HidBus() {
 void HidBus::UpdateHidbus(std::uintptr_t user_data, std::chrono::nanoseconds ns_late) {
     auto& core_timing = system.CoreTiming();
 
-    //ringcon.OnUpdate(core_timing, &hidbus_status,0x900);
+    // ringcon.OnUpdate(core_timing, &hidbus_status,0x900);
 
     // We can send the answer right away no need to wait
     if (send_command_asyc) {
         send_command_asyc_event->GetWritableEvent().Signal();
         send_command_asyc = false;
     }
-
 
     auto& cur_entry = hidbus_status.entries[0];
     cur_entry.is_in_focus = true;
@@ -93,8 +92,6 @@ void HidBus::UpdateHidbus(std::uintptr_t user_data, std::chrono::nanoseconds ns_
 
     core_timing.ScheduleEvent(hidbus_update_ns - ns_late, hidbus_update_event);
 }
-
-
 
 void HidBus::GetBusHandle(Kernel::HLERequestContext& ctx) {
     IPC::RequestParser rp{ctx};
@@ -156,7 +153,7 @@ void HidBus::Initialize(Kernel::HLERequestContext& ctx) {
                 sizeof(hidbus_status));
     is_hidbus_enabled = true;
     LOG_ERROR(Service_HID, "{}", system.Kernel().GetHidBusSharedMem().GetPointer());
-    //for (std::size_t i = 0; i < 40; i++) {
+    // for (std::size_t i = 0; i < 40; i++) {
     //    u8* memory = system.Kernel().GetHidBusSharedMem().GetPointer();
     //    LOG_ERROR(Service_HID, "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
     //              *(memory + (i * 16) + 0), *(memory + (i * 16) + 1), *(memory + (i * 16) + 2),
@@ -181,9 +178,8 @@ void HidBus::EnableExternalDevice(Kernel::HLERequestContext& ctx) {
     };
     const auto parameters{rp.PopRaw<Parameters>()};
 
-    LOG_ERROR(Service_HID,
-              "(STUBBED) called enable={}, pad={}",
-              parameters.enable, parameters.pad[0]);
+    LOG_ERROR(Service_HID, "(STUBBED) called enable={}, pad={}", parameters.enable,
+              parameters.pad[0]);
 
     IPC::ResponseBuilder rb{ctx, 2};
     rb.Push(RESULT_SUCCESS);
@@ -213,9 +209,8 @@ void HidBus::SendCommandAsync(Kernel::HLERequestContext& ctx) {
     LOG_ERROR(Service_HID,
               "(STUBBED) called data_size={}, abstracted_pad_id={} bus_type={} internal_index={} "
               "player_number={} is_valid={}",
-              data.size(),
-              bus_handle_.abstracted_pad_id, bus_handle_.bus_type, bus_handle_.internal_index,
-              bus_handle_.player_number, bus_handle_.is_valid);
+              data.size(), bus_handle_.abstracted_pad_id, bus_handle_.bus_type,
+              bus_handle_.internal_index, bus_handle_.player_number, bus_handle_.is_valid);
 
     ringcon.SetCommand(data);
     send_command_asyc = true;
@@ -231,14 +226,11 @@ void HidBus::GetSendCommandAsynceResult(Kernel::HLERequestContext& ctx) {
 
     ringcon.GetReply(data);
 
-    for (std::size_t i = 0; i < data.size(); i++) {
-        LOG_ERROR(Service_HID, "data[{}]={}", i, data[i]);
-    }
-
-     LOG_ERROR(Service_HID,
-               "(STUBBED) called  abstracted_pad_id={} bus_type={} internal_index={} "
-               "player_number={} is_valid={}", bus_handle_.abstracted_pad_id, bus_handle_.bus_type,
-               bus_handle_.internal_index, bus_handle_.player_number, bus_handle_.is_valid);
+    LOG_ERROR(Service_HID,
+              "(STUBBED) called  abstracted_pad_id={} bus_type={} internal_index={} "
+              "player_number={} is_valid={}",
+              bus_handle_.abstracted_pad_id, bus_handle_.bus_type, bus_handle_.internal_index,
+              bus_handle_.player_number, bus_handle_.is_valid);
 
     u64 data_size = ctx.WriteBuffer(data);
     IPC::ResponseBuilder rb{ctx, 4};

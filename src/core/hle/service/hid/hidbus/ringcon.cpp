@@ -10,7 +10,9 @@
 namespace Service::HID {
 constexpr std::size_t SHARED_MEMORY_OFFSET = 0x0;
 constexpr u8 DEVICE_ID = 0x20;
-constexpr FirmwareVersion version = {0x2c, 0x0};
+constexpr FirmwareVersion version = {0x0, 0x2c};
+constexpr FactoryCalibration factory_calibration = {5469, 742, 2159, 2444};
+constexpr UserCalibration user_calibration = {-13570, 134, -13570, 134, 2188, 62};
 
 RingController::RingController() {}
 RingController::~RingController() = default;
@@ -87,147 +89,125 @@ u8 RingController::GetDeviceId() const {
 }
 void RingController::GetReply(std::vector<u8>& data) {
     switch (command) {
-    case RingConCommands::GetFirmwareVersion: {
-        LOG_ERROR(Service_HID, "firmware");
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(version.sub);
-        data.push_back(version.main);
-        data.push_back(0);
-        data.push_back(0);
-        /* FirmwareVersionResponse reply;
-        reply.status = DataValid::Valid;
-        reply.sub = version.sub;
-        reply.main = version.main;
-        std::memcpy(data.data(), &reply, sizeof(reply));*/
+    case RingConCommands::GetFirmwareVersion:
+        GetFirmwareVersionReply(data);
         return;
-    }
     case RingConCommands::c20105:
-        LOG_ERROR(Service_HID, "c20105");
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(1);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        break;
-    case RingConCommands::GetTotalPushCount:
-        LOG_ERROR(Service_HID, "GetTotalPushCount");
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(30);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(36);
-        // data[7] = GetCrcValue({1,0,0});
-        break;
+        GetC020105Reply(data);
+        return;
+    case RingConCommands::ReadTotalPushCount:
+        GetReadTotalPushCountReply(data);
+        return;
     case RingConCommands::ReadUnkCal:
-        LOG_ERROR(Service_HID, "ReadUnkCal");
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        break;
-    case RingConCommands::ReadManuCal:
-        LOG_ERROR(Service_HID, "ReadManuCal");
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        break;
+        GetReadUnkCalReply(data);
+        return;
+    case RingConCommands::ReadManualCal:
+        GetReadManualCalReply(data);
+        return;
     case RingConCommands::ReadUserCal:
-        LOG_ERROR(Service_HID, "ReadUserCal");
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
-        break;
-    case RingConCommands::PlayReport:
-        LOG_ERROR(Service_HID, "PlayReport");
-        data.push_back(0);
-        data.push_back(0); //
-        data.push_back(0); //
-        data.push_back(0); //
-        data.push_back(29);
-        data.push_back(0);
-        data.push_back(41);
-        data.push_back(0);
-
-        data.push_back(22);
-        data.push_back(87);
-
-        data.push_back(65);
-        data.push_back(77);
-        data.push_back(53);
-        data.push_back(53);
-
-        data.push_back(53);
-        data.push_back(32);
-        break;
+        GetReadUserCalReply(data);
+        return;
+    case RingConCommands::ReadId:
+        GetReadIdReply(data);
+        return;
     default:
         LOG_ERROR(Service_HID, "error");
-        data[0] = 1;
+        data.push_back(1);
     }
 }
 
 void RingController::SetCommand(const std::vector<u8>& data) {
-    if (data[0] == 0 && data[1] == 0 && data[2] == 2) {
-        LOG_ERROR(Service_HID, "firmware");
-        command = RingConCommands::GetFirmwareVersion;
-        return;
+    u32 command_id = data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24);
+    constexpr std::array<RingConCommands, 7> commands = {
+        RingConCommands::GetFirmwareVersion,
+        RingConCommands::c20105,
+        RingConCommands::ReadTotalPushCount,
+        RingConCommands::ReadUnkCal,
+        RingConCommands::ReadManualCal,
+        RingConCommands::ReadUserCal,
+        RingConCommands::ReadId,
+    };
+    for (RingConCommands cmd : commands) {
+        if (command_id == static_cast<u32>(cmd)) {
+            command = cmd;
+            return;
+        }
     }
-    if (data[0] == 5 && data[1] == 1 && data[2] == 2) {
-        LOG_ERROR(Service_HID, "c20105");
-        command = RingConCommands::c20105;
-        return;
-    }
-    if (data[0] == 4 && data[1] == 50 && data[2] == 2) {
-        LOG_ERROR(Service_HID, "GetTotalPushCount");
-        command = RingConCommands::GetTotalPushCount;
-        return;
-    }
-    if (data[0] == 4 && data[1] == 5 && data[2] == 2) {
-        LOG_ERROR(Service_HID, "ReadUnkCal");
-        command = RingConCommands::ReadUnkCal;
-        return;
-    }
-    if (data[0] == 4 && data[1] == 10 && data[2] == 2) {
-        LOG_ERROR(Service_HID, "ReadManuCal");
-        command = RingConCommands::ReadManuCal;
-        return;
-    }
-    if (data[0] == 0 && data[1] == 1 && data[2] == 2) {
-        LOG_ERROR(Service_HID, "PlayReport");
-        command = RingConCommands::PlayReport;
-        return;
-    }
-    if (data[0] == 4 && data[1] == 26 && data[2] == 2) {
-        LOG_ERROR(Service_HID, "ReadUserCal");
-        command = RingConCommands::ReadUserCal;
-        return;
-    }
-    for (std::size_t i = 0; i < data.size(); i++) {
-        LOG_ERROR(Service_HID, "data[{}]={}", i, data[i]);
-    }
-    command = RingConCommands::error;
+    LOG_ERROR(Service_HID, "Command not implemented {}", command_id);
+    command = RingConCommands::Error;
+}
+
+void RingController::GetFirmwareVersionReply(std::vector<u8>& data){
+    LOG_ERROR(Service_HID, "firmware");
+
+    FirmwareVersionReply reply;
+    reply.status = DataValid::Valid;
+    reply.firmware = version;
+    data.resize(sizeof(reply));
+    std::memcpy(data.data(), &reply, sizeof(reply));
+}
+
+void RingController::GetC020105Reply(std::vector<u8>& data) {
+    LOG_ERROR(Service_HID, "c20105");
+
+    Cmd020105Reply reply;
+    reply.status = DataValid::Valid;
+    reply.data = 1;
+    data.resize(sizeof(reply));
+    std::memcpy(data.data(), &reply, sizeof(reply));
+}
+
+void RingController::GetReadTotalPushCountReply(std::vector<u8>& data) {
+    LOG_ERROR(Service_HID, "ReadTotalPushCount");
+
+    GetThreeByteReply reply;
+    reply.data = {30, 0, 0};
+    reply.crc = GetCrcValue({30, 0, 0, 0}); // 36
+    data.resize(sizeof(reply));
+    std::memcpy(data.data(), &reply, sizeof(reply));
+}
+
+void RingController::GetReadUnkCalReply(std::vector<u8>& data) {
+    LOG_ERROR(Service_HID, "ReadUnkCal");
+
+    ReadUnkCalReply reply{};
+    data.resize(sizeof(reply));
+    std::memcpy(data.data(), &reply, sizeof(reply));
+}
+
+void RingController::GetReadManualCalReply(std::vector<u8>& data) {
+    LOG_ERROR(Service_HID, "ReadManuCal");
+
+    ReadManualCalReply reply;
+    reply.status = DataValid::Valid;
+    reply.calibration = factory_calibration;
+    data.resize(sizeof(reply));
+    std::memcpy(data.data(), &reply, sizeof(reply));
+}
+
+void RingController::GetReadUserCalReply(std::vector<u8>& data) {
+    LOG_ERROR(Service_HID, "ReadUserCal");
+
+    ReadUserCalReply reply;
+    reply.status = DataValid::Valid;
+    reply.calibration = user_calibration;
+    data.resize(sizeof(reply));
+    std::memcpy(data.data(), &reply, sizeof(reply));
+}
+
+void RingController::GetReadIdReply(std::vector<u8>& data) {
+    LOG_ERROR(Service_HID, "ReadID");
+
+    ReadIdReply reply;
+    reply.status = DataValid::Valid;
+    reply.id_l_x0 = 8;
+    reply.id_l_x0_2 = 41;
+    reply.id_l_x4 = 22294;
+    reply.id_h_x0 = 19777;
+    reply.id_h_x0_2 = 13621;
+    reply.id_h_x4 = 8245;
+    data.resize(sizeof(reply));
+    std::memcpy(data.data(), &reply, sizeof(reply));
 }
 
 } // namespace Service::HID

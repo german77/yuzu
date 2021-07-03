@@ -13,7 +13,7 @@
 
 namespace Service::HID {
 
-enum class DataValid {
+enum class DataValid : u32_le {
     Valid,
     BadCRC,
     Cal,
@@ -27,15 +27,24 @@ enum class ErrorFlag {
 };
 
 struct FirmwareVersion {
-    u8 main;
     u8 sub;
+    u8 main;
 };
 
 struct FactoryCalibration {
-    s16 os_max;
-    s16 hk_max;
-    s16 zero_min;
-    s16 zero_max;
+    s32_le os_max;
+    s32_le hk_max;
+    s32_le zero_min;
+    s32_le zero_max;
+};
+
+struct UserCalibration {
+    s16_le os_max;
+    u16 os_max_crc;
+    s16_le hk_max;
+    u16 hk_crc;
+    s16_le zero;
+    u16 zero_crc;
 };
 
 class RingController {
@@ -53,37 +62,89 @@ public:
 private:
     enum class RingConCommands : u32_le {
         GetFirmwareVersion = 0x00020000,
-        PlayReport = 0x00020100,
+        ReadId = 0x00020100,
         JoyPolling = 0x00020101,
         Unknown1 = 0x00020104,
         c20105 = 0x00020105,
-        Unknown3 = 0x00020204,
-        Unknown4 = 0x00020304,
-        Unknown5 = 0x00020404,
+        Unknown2 = 0x00020204,
+        Unknown3 = 0x00020304,
+        Unknown4 = 0x00020404,
         ReadUnkCal = 0x00020504,
-        ReadManuCal = 0x00020A04,
-        Unknown8 = 0x00021104,
-        Unknown9 = 0x00021204,
-        Unknown10 = 0x00021304,
+        ReadManualCal = 0x00020A04,
+        Unknown5 = 0x00021104,
+        Unknown6 = 0x00021204,
+        Unknown7 = 0x00021304,
         ReadUserCal = 0x00021A04,
-        Unknown12 = 0x00023104,
-        GetTotalPushCount = 0x00023204,
-        Unknown14 = 0x04013104,
-        Unknown15 = 0x04011104,
-        Unknown16 = 0x04011204,
-        Unknown17 = 0x04011304,
-        error = 0xFFFFFFFF,
+        Unknown8 = 0x00023104,
+        ReadTotalPushCount = 0x00023204,
+        Unknown9 = 0x04013104,
+        Unknown10 = 0x04011104,
+        Unknown11 = 0x04011204,
+        Unknown12 = 0x04011304,
+        Error = 0xFFFFFFFF,
     };
 
-    struct FirmwareVersionResponse {
+    struct FirmwareVersionReply {
         DataValid status;
-        INSERT_PADDING_BYTES(0x3);
-        u8 sub;
-        u8 main;
+        FirmwareVersion firmware;
         INSERT_PADDING_BYTES(0x2);
     };
+    static_assert(sizeof(FirmwareVersionReply) == 0x8, "FirmwareVersionReply is an invalid size");
+
+    struct Cmd020105Reply {
+        DataValid status;
+        u8 data;
+        INSERT_PADDING_BYTES(0x3);
+    };
+    static_assert(sizeof(Cmd020105Reply) == 0x8, "Cmd020105Reply is an invalid size");
+
+    struct GetThreeByteReply {
+        DataValid status;
+        std::array<u8, 3> data;
+        u8 crc;
+    };
+    static_assert(sizeof(GetThreeByteReply) == 0x8, "GetThreeByteReply is an invalid size");
+
+    struct ReadUnkCalReply {
+        DataValid status;
+        u16_le data;
+        INSERT_PADDING_BYTES(0x2);
+    };
+    static_assert(sizeof(ReadUnkCalReply) == 0x8, "ReadUnkCalReply is an invalid size");
+
+    struct ReadManualCalReply {
+        DataValid status;
+        FactoryCalibration calibration;
+    };
+    static_assert(sizeof(ReadManualCalReply) == 0x14, "ReadManualCalReply is an invalid size");
+
+    struct ReadUserCalReply {
+        DataValid status;
+        UserCalibration calibration;
+        INSERT_PADDING_BYTES(0x4);
+    };
+    static_assert(sizeof(ReadUserCalReply) == 0x14, "ReadUserCalReply is an invalid size");
+
+    struct ReadIdReply {
+        DataValid status;
+        u16_le id_l_x0;
+        u16_le id_l_x0_2;
+        u16_le id_l_x4;
+        u16_le id_h_x0;
+        u16_le id_h_x0_2;
+        u16_le id_h_x4;
+    };
+    static_assert(sizeof(ReadIdReply) == 0x10, "ReadIdReply is an invalid size");
 
     u8 GetCrcValue(const std::vector<u8>& data) const;
+
+    void GetFirmwareVersionReply(std::vector<u8>& data);
+    void GetC020105Reply(std::vector<u8>& data);
+    void GetReadTotalPushCountReply(std::vector<u8>& data);
+    void GetReadUnkCalReply(std::vector<u8>& data);
+    void GetReadManualCalReply(std::vector<u8>& data);
+    void GetReadUserCalReply(std::vector<u8>& data);
+    void GetReadIdReply(std::vector<u8>& data);
 
     RingConCommands command;
 };

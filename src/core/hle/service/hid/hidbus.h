@@ -9,11 +9,11 @@
 
 namespace Core::Timing {
 struct EventType;
-}// namespace Core::Timing
+} // namespace Core::Timing
 
 namespace Core {
 class System;
-}// namespace Core
+} // namespace Core
 
 namespace Kernel {
 class KEvent;
