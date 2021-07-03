@@ -596,7 +596,7 @@ struct KernelCore::Impl {
         const PAddr font_phys_addr{system_pool.GetAddress() + hid_size};
         const PAddr irs_phys_addr{system_pool.GetAddress() + hid_size + font_size};
         const PAddr time_phys_addr{system_pool.GetAddress() + hid_size + font_size + irs_size};
-        const PAddr hidbus_addr{system_pool.GetAddress() + hid_size + font_size + irs_size +
+        const PAddr hidbus_phys_addr{system_pool.GetAddress() + hid_size + font_size + irs_size +
                                 time_size};
 
         hid_shared_mem = KSharedMemory::Create(system.Kernel());
@@ -621,10 +621,10 @@ struct KernelCore::Impl {
                                     {time_phys_addr, time_size / PageSize},
                                     Svc::MemoryPermission::None, Svc::MemoryPermission::Read,
                                     time_phys_addr, time_size, "Time:SharedMemory");
-        hidbus_shared_mem->Initialize(system.Kernel(), system.DeviceMemory(), nullptr,
-                                      { hidbus_addr, hidbus_size / PageSize },
+        hidbus_shared_mem->Initialize( system.DeviceMemory(), nullptr,
+                                      {hidbus_phys_addr, hidbus_size / PageSize},
                                       Svc::MemoryPermission::None, Svc::MemoryPermission::Read,
-                                      time_phys_addr, time_size, "hidBus:SharedMemory");
+                                      hidbus_phys_addr, hidbus_size, "HidBus:SharedMemory");
     }
 
     void InitializePageSlab() {

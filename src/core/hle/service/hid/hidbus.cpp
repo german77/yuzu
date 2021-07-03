@@ -47,11 +47,11 @@ HidBus::HidBus(Core::System& system_) : ServiceFramework{system_, "hidbus"} {
 
     auto& kernel = system.Kernel();
     send_command_asyc_event = Kernel::KEvent::Create(kernel);
-    send_command_asyc_event->Initialize("hidbus:SendCommandAsycEvent");
+    send_command_asyc_event->Initialize("Hidbus:SendCommandAsycEvent");
 
     // Register update callbacks
     hidbus_update_event = Core::Timing::CreateEvent(
-        "hidbus::UpdateCallback",
+        "Hidbus::UpdateCallback",
         [this](std::uintptr_t user_data, std::chrono::nanoseconds ns_late) {
             const auto guard = LockService();
             UpdateHidbus(user_data, ns_late);
@@ -70,10 +70,21 @@ void HidBus::UpdateHidbus(std::uintptr_t user_data, std::chrono::nanoseconds ns_
     //ringcon.OnUpdate(core_timing, &hidbus_status,0x900);
 
     // We can send the answer right away no need to wait
-    //if (send_command_asyc) {
-    //    send_command_asyc_event->GetWritableEvent().Signal();
-    //    send_command_asyc = false;
-    //}
+    if (send_command_asyc) {
+        send_command_asyc_event->GetWritableEvent().Signal();
+        send_command_asyc = false;
+    }
+
+
+    auto& cur_entry = hidbus_status.entries[0];
+    cur_entry.is_in_focus = true;
+    cur_entry.is_connected = true;
+    cur_entry.is_connected_result = RESULT_SUCCESS;
+    cur_entry.is_enabled = true;
+    cur_entry.is_polling_mode = true;
+    cur_entry.polling_mode = JoyPollingMode::ButtonOnly;
+    std::memcpy(system.Kernel().GetHidBusSharedMem().GetPointer(), &hidbus_status,
+                sizeof(hidbus_status));
 
     // If ns_late is higher than the update rate ignore the delay
     if (ns_late > hidbus_update_ns) {
@@ -96,6 +107,7 @@ void HidBus::GetBusHandle(Kernel::HLERequestContext& ctx) {
 
     LOG_ERROR(Service_HID, "called. npad_id={} bus_type={}", parameters.npad_id,
               parameters.bus_type);
+    bus_handle.is_valid = true;
     bus_handle.is_valid = true;
     bus_handle.player_number = static_cast<u8>(parameters.npad_id);
     bus_handle.bus_type = BusType::RightJoyRail;
@@ -131,16 +143,29 @@ void HidBus::Initialize(Kernel::HLERequestContext& ctx) {
               bus_handle_.player_number, bus_handle_.is_valid);
 
     for (std::size_t i = 0; i < 19; i++) {
-        hidbus_status.entries[i].is_in_focus = true;
-        hidbus_status.entries[i].is_connected = true;
-        hidbus_status.entries[i].is_connected_result = RESULT_SUCCESS;
-        hidbus_status.entries[i].is_enabled = true;
-        hidbus_status.entries[i].is_polling_mode = true;
-      //  hidbus_status.entries[i].polling_mode = JoyPollingMode::ButtonOnly;
+        auto& cur_entry = hidbus_status.entries[i];
+        cur_entry.is_in_focus = true;
+        cur_entry.is_connected = true;
+        cur_entry.is_connected_result = RESULT_SUCCESS;
+        cur_entry.is_enabled = true;
+        cur_entry.is_polling_mode = true;
+        cur_entry.polling_mode = JoyPollingMode::ButtonOnly;
     }
 
-    std::memcpy(system.Kernel().GetHidBusSharedMem().GetPointer(), &hidbus_status, sizeof(hidbus_status));
+    std::memcpy(system.Kernel().GetHidBusSharedMem().GetPointer(), &hidbus_status,
+                sizeof(hidbus_status));
     is_hidbus_enabled = true;
+    LOG_ERROR(Service_HID, "{}", system.Kernel().GetHidBusSharedMem().GetPointer());
+    //for (std::size_t i = 0; i < 40; i++) {
+    //    u8* memory = system.Kernel().GetHidBusSharedMem().GetPointer();
+    //    LOG_ERROR(Service_HID, "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+    //              *(memory + (i * 16) + 0), *(memory + (i * 16) + 1), *(memory + (i * 16) + 2),
+    //              *(memory + (i * 16) + 3), *(memory + (i * 16) + 4), *(memory + (i * 16) + 5),
+    //              *(memory + (i * 16) + 6), *(memory + (i * 16) + 7), *(memory + (i * 16) + 8),
+    //              *(memory + (i * 16) + 9), *(memory + (i * 16) + 10), *(memory + (i * 16) + 11),
+    //              *(memory + (i * 16) + 12), *(memory + (i * 16) + 11), *(memory + (i * 16) + 14),
+    //              *(memory + (i * 16) + 15));
+    //}
     IPC::ResponseBuilder rb{ctx, 2};
     rb.Push(RESULT_SUCCESS);
 }
@@ -167,6 +192,7 @@ void HidBus::EnableExternalDevice(Kernel::HLERequestContext& ctx) {
 void HidBus::GetExternalDeviceId(Kernel::HLERequestContext& ctx) {
     IPC::RequestParser rp{ctx};
     const auto bus_handle_{rp.PopRaw<HidbusBusHandle>()};
+    const u8 device_id = ringcon.GetDeviceId();
 
     LOG_ERROR(Service_HID,
               "(STUBBED) called abstracted_pad_id={} bus_type={} internal_index={} "
@@ -176,8 +202,7 @@ void HidBus::GetExternalDeviceId(Kernel::HLERequestContext& ctx) {
 
     IPC::ResponseBuilder rb{ctx, 3};
     rb.Push(RESULT_SUCCESS);
-    // 0x20 is the id for the ring controller
-    rb.Push<u32>(0x20);
+    rb.Push<u32>(device_id);
 }
 
 void HidBus::SendCommandAsync(Kernel::HLERequestContext& ctx) {
@@ -192,21 +217,23 @@ void HidBus::SendCommandAsync(Kernel::HLERequestContext& ctx) {
               bus_handle_.abstracted_pad_id, bus_handle_.bus_type, bus_handle_.internal_index,
               bus_handle_.player_number, bus_handle_.is_valid);
 
-    for (std::size_t i = 0; i < data.size(); i++) {
-        LOG_ERROR(Service_HID, "data[{}]={}", i, data[i]);
-    }
-
+    ringcon.SetCommand(data);
     send_command_asyc = true;
 
     IPC::ResponseBuilder rb{ctx, 2};
     rb.Push(RESULT_SUCCESS);
-    send_command_asyc_event->GetWritableEvent().Signal();
 };
 
 void HidBus::GetSendCommandAsynceResult(Kernel::HLERequestContext& ctx) {
     IPC::RequestParser rp{ctx};
     const auto bus_handle_{rp.PopRaw<HidbusBusHandle>()};
-    std::array<u8, 0x8> data;
+    std::vector<u8> data;
+
+    ringcon.GetReply(data);
+
+    for (std::size_t i = 0; i < data.size(); i++) {
+        LOG_ERROR(Service_HID, "data[{}]={}", i, data[i]);
+    }
 
      LOG_ERROR(Service_HID,
                "(STUBBED) called  abstracted_pad_id={} bus_type={} internal_index={} "
@@ -250,7 +277,7 @@ void HidBus::SetStatusManagerType(Kernel::HLERequestContext& ctx) {
     IPC::RequestParser rp{ctx};
     const auto input{rp.PopRaw<u32>()};
 
-    LOG_ERROR(Service_HID, "(STUBBED) called input={}", input);
+    LOG_INFO(Service_HID, "(STUBBED) called input={}", input);
 
     IPC::ResponseBuilder rb{ctx, 2};
     rb.Push(RESULT_SUCCESS);

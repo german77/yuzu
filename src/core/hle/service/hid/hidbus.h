@@ -9,11 +9,11 @@
 
 namespace Core::Timing {
 struct EventType;
-}
+}// namespace Core::Timing
 
 namespace Core {
 class System;
-}
+}// namespace Core
 
 namespace Kernel {
 class KEvent;
@@ -136,11 +136,18 @@ public:
     static_assert(sizeof(HidbusStatusManagerEntry) == 0x80,
                   "HidbusStatusManagerEntry is an invalid size");
 
+    struct CommonHeader {
+        s64_le timestamp;
+        s64_le total_entry_count;
+        s64_le last_entry_index;
+        s64_le entry_count;
+    };
+    static_assert(sizeof(CommonHeader) == 0x20, "CommonHeader is an invalid size");
+
     struct HidbusStatusManager {
         std::array<HidbusStatusManagerEntry, 19> entries{};
     };
-    static_assert(sizeof(HidbusStatusManager) == 0x980,
-                  "JoyButtonOnlyPollingEntry is an invalid size");
+    static_assert(sizeof(HidbusStatusManager) <= 0x1000, "HidbusStatusManager is an invalid size");
 
 private:
     void GetBusHandle(Kernel::HLERequestContext& ctx);
@@ -162,11 +169,9 @@ private:
     bool send_command_asyc{false};
     HidbusBusHandle bus_handle{};
     HidbusStatusManager hidbus_status{};
-    int last_entry_index = 0;
-    int entry_count = 0;
     std::shared_ptr<Core::Timing::EventType> hidbus_update_event;
 
-    Ring_controller ringcon{};
+    RingController ringcon{};
 };
 
 } // namespace Service::HID
