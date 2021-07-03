@@ -10,6 +10,7 @@
 #include "common/settings.h"
 #include "common/swap.h"
 #include "core/frontend/input.h"
+#include "core/hle/result.h"
 
 namespace Service::HID {
 
@@ -136,6 +137,56 @@ private:
     };
     static_assert(sizeof(ReadIdReply) == 0x10, "ReadIdReply is an invalid size");
 
+    enum class JoyPollingMode : u32 {
+        SixAxisSensorDisable,
+        SixAxisSensorEnable,
+        ButtonOnly,
+    };
+
+    struct HidbusStatusManagerEntry {
+        u8 is_connected{};
+        INSERT_PADDING_BYTES(0x3);
+        ResultCode is_connected_result{0};
+        u8 is_enabled{};
+        u8 is_in_focus{};
+        u8 is_polling_mode{};
+        u8 reserved{};
+        JoyPollingMode polling_mode{};
+        std::array<u8, 0x70> data{};
+    };
+    static_assert(sizeof(HidbusStatusManagerEntry) == 0x80,
+                  "HidbusStatusManagerEntry is an invalid size");
+
+    struct JoyButtonOnlyPollingData {
+        std::array<u8, 0x2c> data;
+        u8 out_size;
+        INSERT_PADDING_BYTES(0x3);
+        u64 sampling_number;
+    };
+    static_assert(sizeof(JoyButtonOnlyPollingData) == 0x38,
+                  "JoyButtonOnlyPollingData is an invalid size");
+
+    struct JoyButtonOnlyPollingEntry {
+        u64 sampling_number;
+        JoyButtonOnlyPollingData data;
+    };
+    static_assert(sizeof(JoyButtonOnlyPollingEntry) == 0x40,
+                  "JoyButtonOnlyPollingEntry is an invalid size");
+
+    struct DataAccessorHeader {
+        ResultCode result{RESULT_UNKNOWN};
+        INSERT_PADDING_WORDS(0x1);
+        std::array<u8, 0x18> unused;
+        u64 latest_entry;
+        u64 total_entries;
+    };
+    static_assert(sizeof(DataAccessorHeader) == 0x30, "DataAccessorHeader is an invalid size");
+
+    struct ButtonOnlyPollingDataAccessor {
+        DataAccessorHeader header;
+        std::array<JoyButtonOnlyPollingEntry, 0xb> entries;
+    };
+
     u8 GetCrcValue(const std::vector<u8>& data) const;
 
     void GetFirmwareVersionReply(std::vector<u8>& data);
@@ -147,5 +198,7 @@ private:
     void GetReadIdReply(std::vector<u8>& data);
 
     RingConCommands command;
+    HidbusStatusManagerEntry hidbus_entry{};
+    ButtonOnlyPollingDataAccessor button_data{};
 };
 } // namespace Service::HID

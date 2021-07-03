@@ -67,23 +67,14 @@ HidBus::~HidBus() {
 void HidBus::UpdateHidbus(std::uintptr_t user_data, std::chrono::nanoseconds ns_late) {
     auto& core_timing = system.CoreTiming();
 
-    // ringcon.OnUpdate(core_timing, &hidbus_status,0x900);
-
     // We can send the answer right away no need to wait
     if (send_command_asyc) {
         send_command_asyc_event->GetWritableEvent().Signal();
         send_command_asyc = false;
     }
 
-    auto& cur_entry = hidbus_status.entries[0];
-    cur_entry.is_in_focus = true;
-    cur_entry.is_connected = true;
-    cur_entry.is_connected_result = RESULT_SUCCESS;
-    cur_entry.is_enabled = true;
-    cur_entry.is_polling_mode = true;
-    cur_entry.polling_mode = JoyPollingMode::ButtonOnly;
-    std::memcpy(system.Kernel().GetHidBusSharedMem().GetPointer(), &hidbus_status,
-                sizeof(hidbus_status));
+    u8* shared_memory = system.Kernel().GetHidBusSharedMem().GetPointer();
+    ringcon.OnUpdate(core_timing, shared_memory, 0x1000);
 
     // If ns_late is higher than the update rate ignore the delay
     if (ns_late > hidbus_update_ns) {
